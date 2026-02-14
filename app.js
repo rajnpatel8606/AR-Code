@@ -84,7 +84,7 @@
     const params = new URLSearchParams(window.location.search);
     return {
       restaurant: (params.get('r') || 'default').toLowerCase().trim(),
-      model: params.get('model') || 'Samosa.glb',
+      model: params.get('model') || 'assets/Samosa.glb',
     };
   }
 
