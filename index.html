@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="View 3D food models in augmented reality">
+  <title>AR Food Viewer</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo-wrapper">
+        <img id="restaurant-logo" class="restaurant-logo" src="assets/logos/default.png" alt="Restaurant Logo">
+      </div>
+      <div class="header-text">
+        <h1 id="restaurant-name" class="title">AR Food Viewer</h1>
+        <p id="item-name" class="subtitle">Explore our menu in 3D &amp; AR</p>
+      </div>
+    </header>
+
+    <main class="viewer-section">
+      <div class="model-container">
+        <model-viewer
+          id="model"
+          src="Samosa.glb"
+          ar
+          ar-modes="webxr scene-viewer quick-look"
+          ar-scale="fixed"
+          scale="1 1 1"
+          ar-placement="auto"
+          camera-controls
+          interaction-prompt="auto"
+          auto-rotate
+          rotation-per-second="10deg"
+          shadow-intensity="2"
+          shadow-softness="0.8"
+          exposure="1.9"
+          environment-image="neutral"
+          xr-environment
+          alt="3D Food Model"
+        >
+          <div class="progress-bar" slot="progress-bar">
+            <div class="update-bar"></div>
+          </div>
+          <div id="ar-prompt" slot="hotspot-prompt">
+            <img src="assets/logos/hand.png" alt="AR prompt">
+          </div>
+        </model-viewer>
+      </div>
+
+      <div class="info-bar">
+        <p id="model-label" class="model-label">Samosa</p>
+        <button id="ar-cta" class="ar-cta" onclick="document.querySelector('#model').activateAR()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+          View in AR
+        </button>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>Powered by <strong>AR Food Viewer</strong></p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
