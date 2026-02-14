@@ -230,50 +230,18 @@
     console.log('[AR Food Viewer] Orientation correction:', orientX, orientY, orientZ);
     console.log('[AR Food Viewer] Effective dimensions (m):', effectiveW.toFixed(4), effectiveH.toFixed(4), effectiveD.toFixed(4));
 
-    /* ---- Step 3: Height Normalization ----
-       Compute scale factor to fit model height
-       to TARGET_HEIGHT (0.08m).                       */
-    var scaleByHeight = TARGET_HEIGHT / effectiveH;
+    /* ---- Step 3: Real-World Size Mode ----
+       Keep the model at its original size (1:1 scale).
+       Only orientation correction is applied.
+       The model will display at its actual dimensions
+       as exported from the 3D modeling software.      */
 
-    /* ---- Step 4: Width Normalization ----
-       Compute scale factor to fit model width
-       to TARGET_WIDTH (0.08m).                        */
-    var scaleByWidth = TARGET_WIDTH / effectiveW;
+    var finalScale = 1.0; // Real-world size (no scaling)
 
-    /* ---- Step 5: Volume Normalization ----
-       Instead of applying height OR width scale
-       independently (which could distort), we use
-       volume-based normalization as the final arbiter.
+    console.log('[AR Food Viewer] Using real-world size (scale: 1.0)');
+    console.log('[AR Food Viewer] Model will display at:', effectiveW.toFixed(4), 'm ×', effectiveH.toFixed(4), 'm ×', effectiveD.toFixed(4), 'm');
 
-       Volume normalization finds a UNIFORM scale
-       factor that maps the model's bounding-box
-       volume to the target volume, preserving
-       proportions exactly (zero distortion).
-
-       Formula:
-         currentVolume = W × H × D
-         scaleFactor   = cbrt(targetVolume / currentVolume)
-
-       We then clamp this so it never exceeds the
-       height or width targets — whichever is more
-       restrictive wins.                               */
-
-    var currentVolume = effectiveW * effectiveH * effectiveD;
-    var scaleByVolume = Math.cbrt(TARGET_VOLUME / currentVolume);
-
-    // Choose the most restrictive uniform scale to
-    // guarantee the model fits within both the height
-    // and width targets while preserving proportions.
-    var finalScale = Math.min(scaleByHeight, scaleByWidth, scaleByVolume);
-
-    // Safety clamp: never scale below 1% or above 500%
-    finalScale = Math.max(0.01, Math.min(finalScale, 5.0));
-
-    console.log('[AR Food Viewer] Scale factors — H:', scaleByHeight.toFixed(4),
-      'W:', scaleByWidth.toFixed(4), 'V:', scaleByVolume.toFixed(4),
-      '→ Final:', finalScale.toFixed(4));
-
-    /* ---- Step 6: Apply uniform scale ----
+    /* ---- Step 4: Apply uniform scale ----
        model-viewer's `scale` attribute takes "x y z".
        Uniform value ensures zero distortion.          */
     var s = finalScale.toFixed(6);
