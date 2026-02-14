@@ -62,11 +62,11 @@
      ========================================
      These targets define the desired real-world
      size for food models in the AR scene.
-     - TARGET_HEIGHT / TARGET_WIDTH: 0.15m (15cm)
-     - Realistic size for viewing food in AR
+     - TARGET_HEIGHT / TARGET_WIDTH: 0.40m (40cm)
+     - Large size for comfortable AR viewing
      ======================================== */
-  var TARGET_HEIGHT = 0.15; // meters (15cm - realistic food size)
-  var TARGET_WIDTH  = 0.15; // meters
+  var TARGET_HEIGHT = 0.40; // meters (40cm - large AR display size)
+  var TARGET_WIDTH  = 0.40; // meters
 
   // ---- DOM References ----
   const modelViewer = document.getElementById('model');
