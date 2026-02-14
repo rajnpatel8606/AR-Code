@@ -129,7 +129,9 @@
 
   // ---- Model Load Error Handling ----
   function initErrorHandling() {
-    modelViewer.addEventListener('error', function () {
+    modelViewer.addEventListener('error', function (event) {
+      console.error('[AR Food Viewer] Model load error:', event);
+      console.error('[AR Food Viewer] Model src:', modelViewer.getAttribute('src'));
       modelLabel.textContent = 'Model unavailable';
       itemNameEl.textContent = 'Could not load the 3D model';
     });
@@ -152,6 +154,7 @@
 
   function initNormalization() {
     modelViewer.addEventListener('load', function () {
+      console.log('[AR Food Viewer] Model loaded successfully!');
       // Small delay ensures model-viewer internals
       // (scene graph, bounding box) are fully ready
       requestAnimationFrame(function () {
@@ -308,6 +311,7 @@
 
     // Set model
     var modelFile = params.model;
+    console.log('[AR Food Viewer] Setting model src to:', modelFile);
     modelViewer.setAttribute('src', modelFile);
 
     // Set display name
