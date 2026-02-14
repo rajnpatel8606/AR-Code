@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Test</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #222;
+    }
+    model-viewer {
+      width: 600px;
+      height: 600px;
+      background: #111;
+    }
+  </style>
+</head>
+<body>
+  <model-viewer
+    src="assets/Samosa.glb"
+    camera-controls
+    auto-rotate
+    alt="Test model"
+  >
+  </model-viewer>
+
+  <script>
+    const mv = document.querySelector('model-viewer');
+    mv.addEventListener('load', () => console.log('✅ Model loaded!'));
+    mv.addEventListener('error', (e) => console.error('❌ Model error:', e));
+  </script>
+</body>
+</html>
