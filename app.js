@@ -62,15 +62,11 @@
      ========================================
      These targets define the desired real-world
      size for food models in the AR scene.
-     - TARGET_HEIGHT / TARGET_WIDTH: 0.08m (8cm)
-     - Volume normalization uses a target bounding
-       sphere derived from these dimensions.
+     - TARGET_HEIGHT / TARGET_WIDTH: 0.15m (15cm)
+     - Realistic size for viewing food in AR
      ======================================== */
-  var TARGET_HEIGHT = 0.08; // meters
-  var TARGET_WIDTH  = 0.08; // meters
-
-  // Target volume derived from a bounding box of TARGET x TARGET x TARGET
-  var TARGET_VOLUME = TARGET_HEIGHT * TARGET_WIDTH * TARGET_HEIGHT; // 0.000512 m³
+  var TARGET_HEIGHT = 0.15; // meters (15cm - realistic food size)
+  var TARGET_WIDTH  = 0.15; // meters
 
   // ---- DOM References ----
   const modelViewer = document.getElementById('model');
@@ -230,16 +226,26 @@
     console.log('[AR Food Viewer] Orientation correction:', orientX, orientY, orientZ);
     console.log('[AR Food Viewer] Effective dimensions (m):', effectiveW.toFixed(4), effectiveH.toFixed(4), effectiveD.toFixed(4));
 
-    /* ---- Step 3: Real-World Size Mode ----
-       Keep the model at its original size (1:1 scale).
-       Only orientation correction is applied.
-       The model will display at its actual dimensions
-       as exported from the 3D modeling software.      */
+    /* ---- Step 3: Smart Scaling for AR Visibility ----
+       Scale the model to fit within TARGET_HEIGHT and
+       TARGET_WIDTH while preserving proportions.
+       This ensures the model is visible and comfortable
+       to view in AR at a realistic food item size.    */
 
-    var finalScale = 1.0; // Real-world size (no scaling)
+    // Calculate scale factors based on height and width
+    var scaleByHeight = TARGET_HEIGHT / effectiveH;
+    var scaleByWidth = TARGET_WIDTH / effectiveW;
 
-    console.log('[AR Food Viewer] Using real-world size (scale: 1.0)');
-    console.log('[AR Food Viewer] Model will display at:', effectiveW.toFixed(4), 'm ×', effectiveH.toFixed(4), 'm ×', effectiveD.toFixed(4), 'm');
+    // Use the smaller scale to ensure model fits within both constraints
+    var finalScale = Math.min(scaleByHeight, scaleByWidth);
+
+    // Safety clamp: never scale below 1% or above 1000%
+    finalScale = Math.max(0.01, Math.min(finalScale, 10.0));
+
+    console.log('[AR Food Viewer] Scale factors — H:', scaleByHeight.toFixed(4),
+      'W:', scaleByWidth.toFixed(4), '→ Final:', finalScale.toFixed(4));
+    console.log('[AR Food Viewer] Final AR size:', (effectiveW * finalScale).toFixed(4), 'm ×',
+      (effectiveH * finalScale).toFixed(4), 'm ×', (effectiveD * finalScale).toFixed(4), 'm');
 
     /* ---- Step 4: Apply uniform scale ----
        model-viewer's `scale` attribute takes "x y z".
