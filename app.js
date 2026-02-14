@@ -9,7 +9,7 @@
   const RESTAURANTS = {
     default: {
       name: 'AR Food Viewer',
-      logo: 'assets/logos/default.png',
+      logo: 'assets/logos/default.svg',
       primary: '#ff6b35',
       primaryDark: '#e55a2b',
       bg: '#0e0e0e',
@@ -108,7 +108,7 @@
   // ---- Logo Load Error Fallback ----
   function handleLogoError() {
     restaurantLogo.onerror = null;
-    restaurantLogo.src = 'assets/logos/default.png';
+    restaurantLogo.src = 'assets/logos/default.svg';
   }
 
   // ---- Model Loading Progress ----
