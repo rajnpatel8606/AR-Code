@@ -612,8 +612,12 @@ modelViewer.addEventListener("ar-status", (e) => {
     // setInterval is more reliable than RAF during an active XR session
     arRotRaf = setInterval(() => {
       arRotAngle = (arRotAngle + 0.5) % 360; // 0.5deg per 16ms ≈ 30deg/s
-      modelViewer.setAttribute('orientation',
-        `${arBaseOrient.x}deg ${arRotAngle.toFixed(2)}deg ${arBaseOrient.z}deg`);
+      // When X-correction is applied, world-Y spin maps to the Z Euler component;
+      // otherwise (upright or Z-correction) it maps to the Y Euler component.
+      const o = arBaseOrient.x !== 0
+        ? `${arBaseOrient.x}deg 0deg ${arRotAngle.toFixed(2)}deg`
+        : `0deg ${arRotAngle.toFixed(2)}deg ${arBaseOrient.z}deg`;
+      modelViewer.setAttribute('orientation', o);
     }, 16);
   }
 
