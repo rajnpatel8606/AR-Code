@@ -265,6 +265,68 @@ const config = RESTAURANT_REGISTRY[brandId] || RESTAURANT_REGISTRY["default"];
 
 let activeModelEntry = null;   // full registry entry for the current model
 let currentLoadId    = 0;      // V2.4: increments on every switchModel call
+let switchStartTime  = 0;      // V3.1: tracks model load duration
+
+/* ── V3.1: ANALYTICS ─────────────────────────────────────────────────────── */
+
+const _analytics = (() => {
+  const SESSION_KEY  = "ar_analytics_events";
+  const sessionStart = Date.now();
+  let arSessionStart = null;
+
+  let events = [];
+  try { events = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "[]"); } catch(_) {}
+
+  function save() {
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(events)); } catch(_) {}
+  }
+
+  function track(type, data = {}) {
+    const entry = { type, ts: Date.now(), ...data };
+    events.push(entry);
+    save();
+    console.log(`[V3.1] ${type}`, entry);
+  }
+
+  return {
+    modelView(model)                           { track("model_view",  { model }); },
+    modelLoad(model, dims, scale, durationMs)  { track("model_load",  { model, dims, scale, durationMs }); },
+    arStart(model) { arSessionStart = Date.now(); track("ar_start", { model }); },
+    arPlace(model) { track("ar_place", { model }); },
+    arEnd(model)   {
+      const dur = arSessionStart ? Date.now() - arSessionStart : null;
+      arSessionStart = null;
+      track("ar_end", { model, durationMs: dur });
+    },
+    arFail(model)  { track("ar_fail",  { model }); },
+
+    getReport() {
+      const views    = events.filter(e => e.type === "model_view");
+      const arStarts = events.filter(e => e.type === "ar_start");
+      const arEnds   = events.filter(e => e.type === "ar_end");
+      const avgArDur = arEnds.length
+        ? Math.round(arEnds.reduce((s, e) => s + (e.durationMs || 0), 0) / arEnds.length) : 0;
+      const report = {
+        sessionDurationMs: Date.now() - sessionStart,
+        totalModelViews:   views.length,
+        arActivations:     arStarts.length,
+        avgArDurationMs:   avgArDur,
+        modelViewCounts:   views.reduce((acc, e) => { acc[e.model] = (acc[e.model] || 0) + 1; return acc; }, {}),
+        allEvents: events,
+      };
+      console.table(report.modelViewCounts);
+      return report;
+    },
+
+    clear() {
+      events = [];
+      sessionStorage.removeItem(SESSION_KEY);
+      console.log("[V3.1] Analytics cleared.");
+    }
+  };
+})();
+
+window._arAnalytics = _analytics; // expose to DevTools: _arAnalytics.getReport()
 
 /* ── DOM REFS ────────────────────────────────────────────────────────────── */
 
@@ -327,6 +389,7 @@ function switchModel(btn, entryOrFile) {
   activeModelEntry = entry;          // V2: track active model config
   currentLoadId++;                   // V2.4: invalidate any in-flight load
   modelViewer._expectedLoadId = currentLoadId;
+  _analytics.modelView(entry.file);  // V3.1: track model view
 
   errorBanner.style.display = "none";
   loading.style.display = "block";
@@ -336,6 +399,7 @@ function switchModel(btn, entryOrFile) {
 
   modelViewer.scale       = "1 1 1";          // V2.2: reset before each load
   modelViewer.orientation = "0deg 0deg 0deg"; // V2.3: reset before each load
+  switchStartTime = Date.now();               // V3.1: start load timer
   modelViewer.src = entry.file;
 }
 
@@ -420,6 +484,7 @@ modelViewer.addEventListener("load", () => {
 
   if (!dims || (dims.x === 0 && dims.y === 0 && dims.z === 0)) {
     console.warn("[V2.1] getDimensions() returned zero — skipping normalization.");
+    _analytics.modelLoad(activeModelEntry?.file, null, null, Date.now() - switchStartTime); // V3.1
   } else {
     console.log(
       `[V2.1] Raw dims (m): X=${dims.x.toFixed(4)} Y=${dims.y.toFixed(4)} Z=${dims.z.toFixed(4)}`
@@ -428,6 +493,14 @@ modelViewer.addEventListener("load", () => {
 
     const effectiveDims = applyOrientationCorrection(dims); // V2.3 first
     applyHeightNormalization(effectiveDims);                 // V2.2 second
+
+    // V3.1: track load completion with dims + scale + duration
+    _analytics.modelLoad(
+      activeModelEntry?.file,
+      { x: +dims.x.toFixed(4), y: +dims.y.toFixed(4), z: +dims.z.toFixed(4) },
+      modelViewer.scale,
+      Date.now() - switchStartTime
+    );
   }
 
   // V1 UI updates (unchanged)
@@ -464,6 +537,18 @@ const initEntry = config.models.find(m =>
 ) || config.models[0];
 
 switchModel(buttons[config.models.indexOf(initEntry)], initEntry); // V2: pass full entry
+
+/* ── V3.1: AR STATUS TRACKING ────────────────────────────────────────────── */
+
+modelViewer.addEventListener("ar-status", (e) => {
+  const model  = activeModelEntry?.file || "unknown";
+  switch (e.detail.status) {
+    case "session-started": _analytics.arStart(model); break;
+    case "object-placed":   _analytics.arPlace(model); break;
+    case "not-presenting":  _analytics.arEnd(model);   break;
+    case "failed":          _analytics.arFail(model);  break;
+  }
+});
 
 /* ── PREVENT CAROUSEL TOUCHES FROM TRIGGERING AR ─────────────────────────── */
 
