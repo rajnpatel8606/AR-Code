@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AR Food Viewer</title>
+
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+:root{
+--brand-color:#ff6b35;
+}
+
+body{
+font-family:Arial,sans-serif;
+background:#111;
+min-height:100vh;
+display:flex;
+flex-direction:column;
+}
+
+/* Header */
+
+.title{
+color:white;
+text-align:center;
+padding:15px;
+font-size:20px;
+background:#1a1a1a;
+display:flex;
+align-items:center;
+justify-content:center;
+gap:10px;
+}
+
+#brand-logo{
+height:32px;
+width:auto;
+display:none;
+}
+
+model-viewer{
+width:100%;
+height:60vh;
+background-color:#202020;
+}
+
+/* AR BUTTON */
+
+model-viewer::part(default-ar-button){
+background-color:var(--brand-color);
+border-radius:12px;
+border:none;
+color:white;
+font-weight:bold;
+padding:20px 40px;
+font-size:18px;
+}
+
+/* Progress bar */
+
+#progress-bar-container{
+width:100%;
+height:3px;
+background:#222;
+}
+
+#progress-bar{
+height:3px;
+width:0%;
+background:var(--brand-color);
+transition:width 0.2s ease;
+}
+
+/* Error banner */
+
+#error-banner{
+display:none;
+background:#c0392b;
+color:white;
+text-align:center;
+padding:10px 15px;
+font-size:14px;
+}
+
+/* Loading overlay */
+
+#loading{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+color:white;
+font-size:16px;
+display:none;
+background:rgba(0,0,0,0.7);
+padding:12px 18px;
+border-radius:8px;
+}
+
+/* Carousel */
+
+.slider{
+width:100%;
+text-align:center;
+overflow:hidden;
+background:#1a1a1a;
+padding:15px 0;
+}
+
+.slides{
+display:flex;
+justify-content:center;
+gap:10px;
+flex-wrap:wrap;
+}
+
+.slide{
+padding:12px 22px;
+background:#2a2a2a;
+color:white;
+border:none;
+border-radius:8px;
+cursor:pointer;
+font-size:14px;
+}
+
+.slide.selected{
+border:2px solid var(--brand-color);
+background:#333;
+}
+
+.slide:disabled{
+opacity:0.5;
+cursor:not-allowed;
+}
+
+.instructions{
+color:#888;
+text-align:center;
+padding:15px;
+font-size:13px;
+background:#1a1a1a;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="title">
+  <img id="brand-logo" alt="Brand Logo">
+  <span id="brand-name">AR Food Viewer</span>
+</div>
+
+<model-viewer
+id="model"
+ar
+ar-modes="webxr scene-viewer quick-look"
+ar-scale="fixed"
+ar-placement="Auto"
+camera-controls
+interaction-prompt="auto"
+touch-action="pan-y"
+camera-target="0m 0m 0m"
+auto-rotate
+rotation-per-second="30deg"
+shadow-intensity="2"
+shadow-softness="0.8"
+exposure="1.9"
+environment-image="neutral"
+xr-environment
+alt="3D Food Model"
+>
+
+<div id="loading">Loading model...</div>
+
+<div slot="ar-prompt" style="
+position:absolute;
+bottom:90px;
+left:50%;
+transform:translateX(-50%);
+background:rgba(0,0,0,0.7);
+color:white;
+padding:10px 18px;
+border-radius:8px;
+font-size:14px;
+">
+
+👆 Tap to place • Use two fingers to rotate
+
+</div>
+
+</model-viewer>
+
+<div id="progress-bar-container">
+  <div id="progress-bar"></div>
+</div>
+
+<div id="error-banner">
+  ⚠️ Could not load this model. Showing a default instead.
+</div>
+
+<!-- MODEL CAROUSEL -->
+
+<div class="slider">
+  <div class="slides" id="carousel"></div>
+</div>
+
+<div class="instructions">
+Tap "View in AR" → Point at table → Tap to place → Drag to move
+</div>
+
+
+<script>
+
+/* ── RESTAURANT REGISTRY ─────────────────────────────────────────────────── */
+
+const RESTAURANT_REGISTRY = {
+  default: {
+    name: "AR Food Viewer",
+    color: "#ff6b35",
+    logo: "",
+    models: [
+      { label: "Food",    file: "food.glb"    },
+      { label: "Samosa",  file: "Samosa.glb"  },
+      { label: "Orange",  file: "Orange.glb"  },
+      { label: "Chicken", file: "Chicken.glb" }
+    ]
+  }
+  /* Add more brands here:
+  mcdonalds: {
+    name: "McDonald's",
+    color: "#DA291C",
+    logo: "https://example.com/mcdonalds-logo.png",
+    models: [
+      { label: "Burger", file: "burger.glb" },
+      { label: "Fries",  file: "fries.glb"  }
+    ]
+  }
+  */
+};
+
+const FALLBACK_MODEL = "food.glb";
+
+/* ── URL PARAMETERS ──────────────────────────────────────────────────────── */
+
+const params    = new URLSearchParams(location.search);
+const brandId   = params.get("brand") || "default";
+const initModel = params.get("model");
+
+const config = RESTAURANT_REGISTRY[brandId] || RESTAURANT_REGISTRY["default"];
+
+/* ── DOM REFS ────────────────────────────────────────────────────────────── */
+
+const modelViewer   = document.querySelector("#model");
+const loading       = document.querySelector("#loading");
+const carousel      = document.querySelector("#carousel");
+const progressBar   = document.querySelector("#progress-bar");
+const errorBanner   = document.querySelector("#error-banner");
+const brandName     = document.querySelector("#brand-name");
+const brandLogo     = document.querySelector("#brand-logo");
+
+/* ── BRANDING ────────────────────────────────────────────────────────────── */
+
+function applyBranding(cfg) {
+  document.title = cfg.name;
+  brandName.textContent = cfg.name;
+  document.documentElement.style.setProperty("--brand-color", cfg.color);
+
+  if (cfg.logo) {
+    brandLogo.src = cfg.logo;
+    brandLogo.style.display = "block";
+  }
+}
+
+/* ── CAROUSEL ────────────────────────────────────────────────────────────── */
+
+let buttons = [];
+
+function buildCarousel(cfg) {
+  carousel.innerHTML = "";
+  buttons = [];
+
+  cfg.models.forEach((item, i) => {
+    const btn = document.createElement("button");
+    btn.className = "slide";
+    btn.textContent = item.label;
+    btn.addEventListener("click", () => switchModel(btn, item.file));
+    carousel.appendChild(btn);
+    buttons.push(btn);
+  });
+}
+
+/* ── MODEL SWITCHING ─────────────────────────────────────────────────────── */
+
+function setButtonsDisabled(state) {
+  buttons.forEach(btn => { btn.disabled = state; });
+}
+
+function setSelected(btn) {
+  buttons.forEach(b => b.classList.remove("selected"));
+  btn.classList.add("selected");
+}
+
+function switchModel(btn, file) {
+  errorBanner.style.display = "none";
+  loading.style.display = "block";
+  progressBar.style.width = "0%";
+  setButtonsDisabled(true);
+  setSelected(btn);
+  modelViewer.src = file;
+}
+
+/* ── PROGRESS ────────────────────────────────────────────────────────────── */
+
+modelViewer.addEventListener("progress", (e) => {
+  const pct = e.detail.totalProgress * 100;
+  progressBar.style.width = pct + "%";
+});
+
+/* ── LOAD COMPLETE ───────────────────────────────────────────────────────── */
+
+modelViewer.addEventListener("load", () => {
+  loading.style.display = "none";
+  progressBar.style.width = "100%";
+  setButtonsDisabled(false);
+  setTimeout(() => { progressBar.style.width = "0%"; }, 400);
+});
+
+/* ── ERROR HANDLING ──────────────────────────────────────────────────────── */
+
+modelViewer.addEventListener("error", () => {
+  errorBanner.style.display = "block";
+  loading.style.display = "none";
+  setButtonsDisabled(false);
+
+  if (modelViewer.src !== FALLBACK_MODEL) {
+    modelViewer.src = FALLBACK_MODEL;
+    const fallbackBtn = buttons.find(b =>
+      b.textContent === config.models.find(m => m.file === FALLBACK_MODEL)?.label
+    );
+    if (fallbackBtn) setSelected(fallbackBtn);
+  }
+});
+
+/* ── INIT ────────────────────────────────────────────────────────────────── */
+
+applyBranding(config);
+buildCarousel(config);
+
+// Pick initial model: URL param > first in list
+const initEntry = config.models.find(m =>
+  m.file === initModel || m.label.toLowerCase() === (initModel || "").toLowerCase()
+) || config.models[0];
+
+switchModel(buttons[config.models.indexOf(initEntry)], initEntry.file);
+
+/* ── PREVENT CAROUSEL TOUCHES FROM TRIGGERING AR ─────────────────────────── */
+
+document.querySelector(".slider").addEventListener("beforexrselect", (ev) => {
+  ev.preventDefault();
+});
+
+</script>
+
+</body>
+</html>
