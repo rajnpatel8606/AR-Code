@@ -320,6 +320,9 @@ const config = RESTAURANT_REGISTRY[brandId] || RESTAURANT_REGISTRY["default"];
 let activeModelEntry = null;   // full registry entry for the current model
 let currentLoadId    = 0;      // V2.4: increments on every switchModel call
 let switchStartTime  = 0;      // V3.1: tracks model load duration
+let arBaseOrient     = { x: 0, z: 0 }; // V3.2: base X/Z from V2.3 correction
+let arRotAngle       = 0;      // V3.2: current Y rotation in AR (degrees)
+let arRotRaf         = null;   // V3.2: requestAnimationFrame handle
 
 /* ── V3.1: ANALYTICS ─────────────────────────────────────────────────────── */
 
@@ -466,6 +469,8 @@ function applyOrientationCorrection(dims) {
   // Per-model override: skip auto-detection entirely
   if (activeModelEntry?.orientation != null) {
     modelViewer.orientation = activeModelEntry.orientation;
+    const p = activeModelEntry.orientation.match(/-?\d+(\.\d+)?/g) || [0,0,0];
+    arBaseOrient = { x: +p[0], z: +p[2] }; // V3.2
     console.log(`[V2.3] Orientation override: ${activeModelEntry.orientation}`);
     return effectiveDims;
   }
@@ -475,6 +480,7 @@ function applyOrientationCorrection(dims) {
 
   if (!looksFlat) {
     modelViewer.orientation = "0deg 0deg 0deg";
+    arBaseOrient = { x: 0, z: 0 }; // V3.2
     console.log("[V2.3] Model upright — no correction needed.");
     return effectiveDims;
   }
@@ -483,11 +489,13 @@ function applyOrientationCorrection(dims) {
   if (z >= x) {
     // Z is tallest: model lying on its back — rotate -90° around X
     modelViewer.orientation = "-90deg 0deg 0deg";
+    arBaseOrient = { x: -90, z: 0 }; // V3.2
     effectiveDims = { x, y: z, z: y };  // Z becomes the visual height
     console.log("[V2.3] Flat (Z-tallest) — applying -90deg X rotation.");
   } else {
     // X is tallest: model lying on its side — rotate 90° around Z
     modelViewer.orientation = "0deg 0deg 90deg";
+    arBaseOrient = { x: 0, z: 90 }; // V3.2
     effectiveDims = { x: y, y: x, z };  // X becomes the visual height
     console.log("[V2.3] Flat (X-tallest) — applying 90deg Z rotation.");
   }
@@ -596,7 +604,34 @@ switchModel(buttons[config.models.indexOf(initEntry)], initEntry); // V2: pass f
 
 modelViewer.addEventListener("ar-status", (e) => {
   const model  = activeModelEntry?.file || "unknown";
-  switch (e.detail.status) {
+  const status = e.detail.status;
+
+  /* ── V3.2: AR AUTO-ROTATION ──────────────────────────────────────────── */
+  if (status === "session-started") {
+    arRotAngle = 0;
+    let lastTs = null;
+    const SPEED = 30; // degrees per second
+    function arRotStep(ts) {
+      if (lastTs !== null) {
+        arRotAngle = (arRotAngle + SPEED * (ts - lastTs) / 1000) % 360;
+        modelViewer.orientation =
+          `${arBaseOrient.x}deg ${arRotAngle.toFixed(2)}deg ${arBaseOrient.z}deg`;
+      }
+      lastTs = ts;
+      arRotRaf = requestAnimationFrame(arRotStep);
+    }
+    arRotRaf = requestAnimationFrame(arRotStep);
+  }
+
+  if (status === "not-presenting") {
+    if (arRotRaf) { cancelAnimationFrame(arRotRaf); arRotRaf = null; }
+    arRotAngle = 0;
+    // Restore base orientation (no Y spin)
+    modelViewer.orientation = `${arBaseOrient.x}deg 0deg ${arBaseOrient.z}deg`;
+  }
+
+  /* ── V3.1: ANALYTICS ─────────────────────────────────────────────────── */
+  switch (status) {
     case "session-started": _analytics.arStart(model); break;
     case "object-placed":   _analytics.arPlace(model); break;
     case "not-presenting":  _analytics.arEnd(model);   break;
