@@ -609,25 +609,20 @@ modelViewer.addEventListener("ar-status", (e) => {
   /* ── V3.2: AR AUTO-ROTATION ──────────────────────────────────────────── */
   if (status === "session-started") {
     arRotAngle = 0;
-    let lastTs = null;
-    const SPEED = 30; // degrees per second
-    function arRotStep(ts) {
-      if (lastTs !== null) {
-        arRotAngle = (arRotAngle + SPEED * (ts - lastTs) / 1000) % 360;
-        modelViewer.orientation =
-          `${arBaseOrient.x}deg ${arRotAngle.toFixed(2)}deg ${arBaseOrient.z}deg`;
-      }
-      lastTs = ts;
-      arRotRaf = requestAnimationFrame(arRotStep);
-    }
-    arRotRaf = requestAnimationFrame(arRotStep);
+    // setInterval is more reliable than RAF during an active XR session
+    arRotRaf = setInterval(() => {
+      arRotAngle = (arRotAngle + 0.5) % 360; // 0.5deg per 16ms ≈ 30deg/s
+      modelViewer.setAttribute('orientation',
+        `${arBaseOrient.x}deg ${arRotAngle.toFixed(2)}deg ${arBaseOrient.z}deg`);
+    }, 16);
   }
 
   if (status === "not-presenting") {
-    if (arRotRaf) { cancelAnimationFrame(arRotRaf); arRotRaf = null; }
+    if (arRotRaf) { clearInterval(arRotRaf); arRotRaf = null; }
     arRotAngle = 0;
     // Restore base orientation (no Y spin)
-    modelViewer.orientation = `${arBaseOrient.x}deg 0deg ${arBaseOrient.z}deg`;
+    modelViewer.setAttribute('orientation',
+      `${arBaseOrient.x}deg 0deg ${arBaseOrient.z}deg`);
   }
 
   /* ── V3.1: ANALYTICS ─────────────────────────────────────────────────── */
