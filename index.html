@@ -229,11 +229,12 @@ const RESTAURANT_REGISTRY = {
     name: "AR Food Viewer",
     color: "#ff6b35",
     logo: "",
+    targetHeight: 0.20,                                           // V2.2: brand default 20 cm
     models: [
-      { label: "Food",    file: "food.glb"    },
-      { label: "Samosa",  file: "Samosa2_opt.glb" },
-      { label: "Orange",  file: "Orange.glb"  },
-      { label: "Chicken", file: "Chicken.glb" }
+      { label: "Food",    file: "food.glb"                                      },
+      { label: "Samosa",  file: "Samosa2_opt.glb", targetHeight: 0.12           }, // 12 cm
+      { label: "Orange",  file: "Orange.glb"                                    },
+      { label: "Chicken", file: "Chicken.glb",     targetHeight: 0.30           }  // 30 cm
     ]
   }
   /* Add more brands here:
@@ -241,9 +242,10 @@ const RESTAURANT_REGISTRY = {
     name: "McDonald's",
     color: "#DA291C",
     logo: "https://example.com/mcdonalds-logo.png",
+    targetHeight: 0.20,
     models: [
       { label: "Burger", file: "burger.glb" },
-      { label: "Fries",  file: "fries.glb"  }
+      { label: "Fries",  file: "fries.glb", targetHeight: 0.25, orientation: "0deg 0deg 0deg" }
     ]
   }
   */
@@ -258,6 +260,11 @@ const brandId   = params.get("brand") || "default";
 const initModel = params.get("model");
 
 const config = RESTAURANT_REGISTRY[brandId] || RESTAURANT_REGISTRY["default"];
+
+/* ── ACTIVE MODEL STATE (V2) ─────────────────────────────────────────────── */
+
+let activeModelEntry = null;   // full registry entry for the current model
+let currentLoadId    = 0;      // V2.4: increments on every switchModel call
 
 /* ── DOM REFS ────────────────────────────────────────────────────────────── */
 
@@ -294,7 +301,7 @@ function buildCarousel(cfg) {
     const btn = document.createElement("button");
     btn.className = "slide";
     btn.textContent = item.label;
-    btn.addEventListener("click", () => switchModel(btn, item.file));
+    btn.addEventListener("click", () => switchModel(btn, item)); // V2: pass full entry
     carousel.appendChild(btn);
     buttons.push(btn);
   });
@@ -311,13 +318,85 @@ function setSelected(btn) {
   btn.classList.add("selected");
 }
 
-function switchModel(btn, file) {
+function switchModel(btn, entryOrFile) {
+  // Accept full entry object (V2) or legacy string (fallback/init)
+  const entry = (typeof entryOrFile === "string")
+    ? config.models.find(m => m.file === entryOrFile) || { file: entryOrFile }
+    : entryOrFile;
+
+  activeModelEntry = entry;          // V2: track active model config
+  currentLoadId++;                   // V2.4: invalidate any in-flight load
+  modelViewer._expectedLoadId = currentLoadId;
+
   errorBanner.style.display = "none";
   loading.style.display = "block";
   progressBar.style.width = "0%";
   setButtonsDisabled(true);
   setSelected(btn);
-  modelViewer.src = file;
+
+  modelViewer.scale       = "1 1 1";          // V2.2: reset before each load
+  modelViewer.orientation = "0deg 0deg 0deg"; // V2.3: reset before each load
+  modelViewer.src = entry.file;
+}
+
+/* ── V2.3: AUTO ORIENTATION CORRECTION ───────────────────────────────────── */
+
+function applyOrientationCorrection(dims) {
+  const { x, y, z } = dims;
+  let effectiveDims = { x, y, z }; // may be remapped after rotation
+
+  // Per-model override: skip auto-detection entirely
+  if (activeModelEntry?.orientation != null) {
+    modelViewer.orientation = activeModelEntry.orientation;
+    console.log(`[V2.3] Orientation override: ${activeModelEntry.orientation}`);
+    return effectiveDims;
+  }
+
+  // Heuristic: if Y (up-axis) is much smaller than X or Z, model is lying flat
+  const looksFlat = (y < x * 0.5) || (y < z * 0.5);
+
+  if (!looksFlat) {
+    modelViewer.orientation = "0deg 0deg 0deg";
+    console.log("[V2.3] Model upright — no correction needed.");
+    return effectiveDims;
+  }
+
+  // Determine which horizontal axis is tallest to pick the right rotation
+  if (z >= x) {
+    // Z is tallest: model lying on its back — rotate -90° around X
+    modelViewer.orientation = "-90deg 0deg 0deg";
+    effectiveDims = { x, y: z, z: y };  // Z becomes the visual height
+    console.log("[V2.3] Flat (Z-tallest) — applying -90deg X rotation.");
+  } else {
+    // X is tallest: model lying on its side — rotate 90° around Z
+    modelViewer.orientation = "0deg 0deg 90deg";
+    effectiveDims = { x: y, y: x, z };  // X becomes the visual height
+    console.log("[V2.3] Flat (X-tallest) — applying 90deg Z rotation.");
+  }
+
+  return effectiveDims;
+}
+
+/* ── V2.2: HEIGHT NORMALIZATION ──────────────────────────────────────────── */
+
+function applyHeightNormalization(effectiveDims) {
+  // Resolve target height: per-model > per-brand > hardcoded fallback (20 cm)
+  const targetHeight = activeModelEntry?.targetHeight ?? config.targetHeight ?? 0.20;
+  const modelHeight  = effectiveDims.y;  // effective Y after any orientation correction
+
+  if (modelHeight <= 0) {
+    console.warn("[V2.2] Effective Y is zero — skipping height normalization.");
+    return;
+  }
+
+  const scaleFactor = targetHeight / modelHeight;
+  const clamped     = Math.max(0.01, Math.min(scaleFactor, 10.0)); // safety clamp
+  const s           = clamped.toFixed(6);
+
+  modelViewer.scale = `${s} ${s} ${s}`;
+  console.log(
+    `[V2.2] targetH=${targetHeight}m | modelY=${modelHeight.toFixed(4)}m | scale=${s}`
+  );
 }
 
 /* ── PROGRESS ────────────────────────────────────────────────────────────── */
@@ -330,6 +409,28 @@ modelViewer.addEventListener("progress", (e) => {
 /* ── LOAD COMPLETE ───────────────────────────────────────────────────────── */
 
 modelViewer.addEventListener("load", () => {
+  // V2.4: stale-load guard — ignore events from rapid model switching
+  if (modelViewer._expectedLoadId !== currentLoadId) {
+    console.log("[V2.4] Stale load event ignored.");
+    return;
+  }
+
+  // V2.1: read bounding box
+  const dims = modelViewer.getDimensions();
+
+  if (!dims || (dims.x === 0 && dims.y === 0 && dims.z === 0)) {
+    console.warn("[V2.1] getDimensions() returned zero — skipping normalization.");
+  } else {
+    console.log(
+      `[V2.1] Raw dims (m): X=${dims.x.toFixed(4)} Y=${dims.y.toFixed(4)} Z=${dims.z.toFixed(4)}`
+    );
+    modelViewer._lastDimensions = dims; // expose for DevTools inspection
+
+    const effectiveDims = applyOrientationCorrection(dims); // V2.3 first
+    applyHeightNormalization(effectiveDims);                 // V2.2 second
+  }
+
+  // V1 UI updates (unchanged)
   loading.style.display = "none";
   progressBar.style.width = "100%";
   setButtonsDisabled(false);
@@ -362,7 +463,7 @@ const initEntry = config.models.find(m =>
   m.file === initModel || m.label.toLowerCase() === (initModel || "").toLowerCase()
 ) || config.models[0];
 
-switchModel(buttons[config.models.indexOf(initEntry)], initEntry.file);
+switchModel(buttons[config.models.indexOf(initEntry)], initEntry); // V2: pass full entry
 
 /* ── PREVENT CAROUSEL TOUCHES FROM TRIGGERING AR ─────────────────────────── */
 
