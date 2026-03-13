@@ -149,40 +149,75 @@ border-radius:8px;
 
 /* Carousel */
 
-.slider{
-width:100%;
-text-align:center;
-overflow:hidden;
-background:#1a1a1a;
-padding:15px 0;
+.slider {
+  width: 100%;
+  overflow: hidden;
+  background: #1a1a1a;
+  padding: 12px 0;
 }
 
-.slides{
-display:flex;
-justify-content:center;
-gap:10px;
-flex-wrap:wrap;
+.slides {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0 10px;
 }
 
-.slide{
-padding:12px 22px;
-background:#2a2a2a;
-color:white;
-border:none;
-border-radius:8px;
-cursor:pointer;
-font-size:14px;
+.slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 88px;
+  padding: 8px 6px 10px;
+  background: #2a2a2a;
+  color: white;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: border-color 0.15s;
 }
 
-.slide.selected{
-border:2px solid var(--brand-color);
-background:#333;
+.slide.selected {
+  border-color: var(--brand-color);
+  background: #333;
 }
 
-.slide:disabled{
-opacity:0.5;
-cursor:not-allowed;
+.slide:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
+
+/* Thumbnail image inside card */
+.slide-thumb {
+  width: 72px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #1a1a1a;
+  display: block;
+}
+
+/* Placeholder shown while thumbnail not yet captured */
+.slide-thumb-placeholder {
+  width: 72px;
+  height: 54px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.slide-thumb-placeholder svg { opacity: 0.4; }
+
+/* Hide img when no src yet; hide placeholder once img has src */
+.slide img.slide-thumb[src=""] { display: none; }
+.slide img.slide-thumb:not([src=""]) + .slide-thumb-placeholder { display: none; }
 
 .instructions{
 color:#888;
@@ -413,11 +448,33 @@ function buildCarousel(cfg) {
   carousel.innerHTML = "";
   buttons = [];
 
-  cfg.models.forEach((item, i) => {
+  cfg.models.forEach((item) => {
     const btn = document.createElement("button");
     btn.className = "slide";
-    btn.textContent = item.label;
-    btn.addEventListener("click", () => switchModel(btn, item)); // V2: pass full entry
+
+    // Thumbnail (pre-filled from sessionStorage cache if available)
+    const img = document.createElement("img");
+    img.className = "slide-thumb";
+    img.alt = item.label;
+    const cached = sessionStorage.getItem(`ar_thumb_${item.file}`);
+    img.src = cached || "";
+
+    // Placeholder cube icon shown until thumbnail is captured
+    const placeholder = document.createElement("div");
+    placeholder.className = "slide-thumb-placeholder";
+    placeholder.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="12" y1="3" x2="12" y2="21" stroke="white" stroke-width="1.5"/>
+      <line x1="4" y1="7.5" x2="20" y2="7.5" stroke="white" stroke-width="1.5"/>
+    </svg>`;
+
+    const label = document.createElement("span");
+    label.textContent = item.label;
+
+    btn.appendChild(img);
+    btn.appendChild(placeholder);
+    btn.appendChild(label);
+    btn.addEventListener("click", () => switchModel(btn, item));
     carousel.appendChild(btn);
     buttons.push(btn);
   });
@@ -567,6 +624,22 @@ modelViewer.addEventListener("load", () => {
   progressBar.style.width = "100%";
   setButtonsDisabled(false);
   setTimeout(() => { progressBar.style.width = "0%"; }, 400);
+
+  // V3.2: auto-capture thumbnail from canvas
+  const _thumbEntry = activeModelEntry;
+  setTimeout(() => {
+    if (!_thumbEntry) return;
+    try {
+      const dataUrl = modelViewer.toDataURL('image/jpeg', 0.6);
+      const idx = config.models.indexOf(_thumbEntry);
+      if (idx >= 0 && buttons[idx]) {
+        const img = buttons[idx].querySelector('.slide-thumb');
+        if (img) img.src = dataUrl;
+      }
+      try { sessionStorage.setItem(`ar_thumb_${_thumbEntry.file}`, dataUrl); } catch(_) {}
+      console.log(`[V3.2] Thumbnail captured: ${_thumbEntry.file}`);
+    } catch(e) { console.log('[V3.2] toDataURL skipped:', e.message); }
+  }, 150);
 });
 
 /* ── ERROR HANDLING ──────────────────────────────────────────────────────── */
