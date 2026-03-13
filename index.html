@@ -508,8 +508,9 @@ function switchModel(btn, entryOrFile) {
   setButtonsDisabled(true);
   setSelected(btn);
 
-  modelViewer.scale       = "1 1 1";          // V2.2: reset before each load
+  modelViewer.scale       = "1 1 1";          // V2.2: reset to native scale for viewer
   modelViewer.orientation = "0deg 0deg 0deg"; // V2.3: reset before each load
+  modelViewer.removeAttribute('camera-orbit');               // let model-viewer auto-frame
   switchStartTime = Date.now();               // V3.1: start load timer
   modelViewer.src = entry.file;
 }
@@ -573,9 +574,11 @@ function applyHeightNormalization(effectiveDims) {
   const clamped     = Math.max(0.01, Math.min(scaleFactor, 10.0)); // safety clamp
   const s           = clamped.toFixed(6);
 
-  modelViewer.scale = `${s} ${s} ${s}`;
+  // Store scale on entry for AR use only — viewer stays at native scale for correct auto-framing
+  if (activeModelEntry) activeModelEntry._arScale = `${s} ${s} ${s}`;
+
   console.log(
-    `[V2.2] targetH=${targetHeight}m | modelY=${modelHeight.toFixed(4)}m | scale=${s}`
+    `[V2.2] targetH=${targetHeight}m | modelY=${modelHeight.toFixed(4)}m | arScale=${s}`
   );
 }
 
@@ -672,11 +675,20 @@ switchModel(buttons[config.models.indexOf(initEntry)], initEntry); // V2: pass f
 
 /* ── V3.1: AR STATUS TRACKING ────────────────────────────────────────────── */
 
+/* ── V2.2: Apply physical AR scale on button click, restore on exit ──────── */
+document.getElementById('ar-btn').addEventListener('click', () => {
+  if (activeModelEntry?._arScale) modelViewer.scale = activeModelEntry._arScale;
+});
+
 modelViewer.addEventListener("ar-status", (e) => {
   const model  = activeModelEntry?.file || "unknown";
   const status = e.detail.status;
 
-/* ── V3.1: ANALYTICS ─────────────────────────────────────────────────── */
+  if (status === "not-presenting") {
+    modelViewer.scale = "1 1 1"; // V2.2: restore native scale for viewer
+  }
+
+  /* ── V3.1: ANALYTICS ─────────────────────────────────────────────────── */
   switch (status) {
     case "session-started": _analytics.arStart(model); break;
     case "object-placed":   _analytics.arPlace(model); break;
