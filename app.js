@@ -121,7 +121,7 @@ const RESTAURANTS = {
 };
 
 /** File to load if a model errors and no better fallback exists */
-const FALLBACK_MODEL = 'food.glb';
+const FALLBACK_MODEL = 'assets/food.glb';
 
 /* ══════════════════════════════════════════════════════════════════════════════
    MODULE 2 — ANALYTICS TRACKER  (V3.1)
