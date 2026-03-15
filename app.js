@@ -53,7 +53,7 @@ const RESTAURANTS = {
     targetHeight: 0.20,          // 20 cm brand-wide default
     models: [
       { label: 'Food',    file: 'assets/food.glb'                                       },
-      { label: 'Samosa',  file: 'assets/Samosa2_opt.glb', targetHeight: 0.12            }, // 12 cm
+      { label: 'Samosa Plate',  file: 'assets/Samosa Plate LA.glb', targetHeight: 0.12            }, // 12 cm
       { label: 'Orange',  file: 'assets/Orange.glb',       targetHeight: 0.042          }, // ~4 cm
       { label: 'Chicken',     file: 'assets/Chicken.glb',    targetHeight: 0.30  }, // 30 cm
       { label: 'CMF Earbuds', file: 'assets/CMFEarbuds.glb',  targetHeight: 0.07  }  //  7 cm
