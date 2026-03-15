@@ -5,705 +5,99 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AR Food Viewer</title>
 
+<!-- model-viewer WebXR component -->
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
 
-<style>
-
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-}
-
-:root{
---brand-color:#ff6b35;
-}
-
-body{
-font-family:Arial,sans-serif;
-background:#111;
-min-height:100vh;
-display:flex;
-flex-direction:column;
-}
-
-/* Header */
-
-.title{
-color:white;
-text-align:center;
-padding:15px;
-font-size:20px;
-background:#1a1a1a;
-display:flex;
-align-items:center;
-justify-content:center;
-gap:10px;
-}
-
-#brand-logo{
-height:32px;
-width:auto;
-display:none;
-}
-
-model-viewer{
-width:100%;
-height:60vh;
-background-color:#202020;
-}
-
-/* AR BUTTON — custom slot="ar-button" */
-
-#ar-btn{
-/* Layout */
-display:flex;
-align-items:center;
-gap:10px;
-white-space:nowrap;
-
-/* Position — bottom centre of model-viewer */
-position:absolute;
-bottom:28px;
-left:50%;
-transform:translateX(-50%);
-
-/* Shape */
-border:none;
-border-radius:50px;
-padding:14px 30px;
-cursor:pointer;
-
-/* Gradient */
-background:linear-gradient(135deg, var(--brand-color) 0%, #e8430a 100%);
-
-/* Typography */
-color:white;
-font-family:Arial,sans-serif;
-font-size:16px;
-font-weight:700;
-letter-spacing:0.4px;
-
-/* Glow shadow */
-box-shadow:
-  0 4px 15px rgba(0,0,0,0.35),
-  0 0 25px rgba(255,107,53,0.45);
-
-/* Hover / tap */
-transition:transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-
-/* Pulsing glow */
-animation:ar-btn-pulse 2.8s ease-in-out infinite;
-}
-
-#ar-btn:active{
-transform:translateX(-50%) scale(0.97);
-opacity:0.9;
-}
-
-@keyframes ar-btn-pulse{
-0%,100%{ box-shadow:0 4px 15px rgba(0,0,0,0.35), 0 0 22px rgba(255,107,53,0.40); }
-50%    { box-shadow:0 4px 20px rgba(0,0,0,0.35), 0 0 42px rgba(255,107,53,0.72); }
-}
-
-/* Progress bar */
-
-#progress-bar-container{
-width:100%;
-height:3px;
-background:#222;
-}
-
-#progress-bar{
-height:3px;
-width:0%;
-background:var(--brand-color);
-transition:width 0.2s ease;
-}
-
-/* Error banner */
-
-#error-banner{
-display:none;
-background:#c0392b;
-color:white;
-text-align:center;
-padding:10px 15px;
-font-size:14px;
-}
-
-/* Loading overlay */
-
-#loading{
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-color:white;
-font-size:16px;
-display:none;
-background:rgba(0,0,0,0.7);
-padding:12px 18px;
-border-radius:8px;
-}
-
-/* Carousel */
-
-.slider {
-  width: 100%;
-  overflow: hidden;
-  background: #1a1a1a;
-  padding: 12px 0;
-}
-
-.slides {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 0 10px;
-}
-
-.slide {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 88px;
-  padding: 8px 6px 10px;
-  background: #2a2a2a;
-  color: white;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  transition: border-color 0.15s;
-}
-
-.slide.selected {
-  border-color: var(--brand-color);
-  background: #333;
-}
-
-.slide:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Thumbnail image inside card */
-.slide-thumb {
-  width: 72px;
-  height: 54px;
-  object-fit: cover;
-  border-radius: 6px;
-  background: #1a1a1a;
-  display: block;
-}
-
-/* Placeholder shown while thumbnail not yet captured */
-.slide-thumb-placeholder {
-  width: 72px;
-  height: 54px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.slide-thumb-placeholder svg { opacity: 0.4; }
-
-/* Hide img when no src yet; hide placeholder once img has src */
-.slide img.slide-thumb[src=""] { display: none; }
-.slide img.slide-thumb:not([src=""]) + .slide-thumb-placeholder { display: none; }
-
-.instructions{
-color:#888;
-text-align:center;
-padding:15px;
-font-size:13px;
-background:#1a1a1a;
-}
-
-</style>
+<!-- App styles (CSS variables + all layout/UI rules) -->
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
 <div class="title">
   <img id="brand-logo" alt="Brand Logo">
   <span id="brand-name">AR Food Viewer</span>
 </div>
 
+<!-- ── 3-D / AR Viewer ────────────────────────────────────────────────── -->
 <model-viewer
-id="model"
-ar
-ar-modes="webxr scene-viewer quick-look"
-ar-scale="fixed"
-ar-placement="floor"
-camera-controls
-interaction-prompt="auto"
-touch-action="pan-y"
-camera-target="0m 0m 0m"
-auto-rotate
-rotation-per-second="30deg"
-shadow-intensity="2"
-shadow-softness="0.8"
-exposure="1.9"
-environment-image="neutral"
-xr-environment
-alt="3D Food Model"
+  id="model"
+  ar
+  ar-modes="webxr scene-viewer quick-look"
+  ar-scale="fixed"
+  ar-placement="floor"
+  camera-controls
+  interaction-prompt="auto"
+  touch-action="pan-y"
+  camera-target="0m 0m 0m"
+  auto-rotate
+  rotation-per-second="30deg"
+  shadow-intensity="2"
+  shadow-softness="0.8"
+  exposure="1.9"
+  environment-image="neutral"
+  xr-environment
+  alt="3D Food Model"
 >
 
-<div id="loading">Loading model...</div>
+  <div id="loading">Loading model...</div>
 
-<!-- Custom AR button (slot="ar-button" — only shown on AR-capable devices) -->
-<button slot="ar-button" id="ar-btn">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <!-- AR scan-frame corner brackets -->
-    <path d="M3 8V4h4M17 4h4v4M21 16v4h-4M7 20H3v-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <!-- 3D cube -->
-    <path d="M12 9l3.5 2v4L12 17l-3.5-2v-4L12 9z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-    <line x1="12" y1="9" x2="12" y2="17" stroke="white" stroke-width="1.5"/>
-    <line x1="8.5" y1="11" x2="15.5" y2="11" stroke="white" stroke-width="1.5"/>
-  </svg>
-  View in Your Space
-</button>
+  <!-- Custom AR button — only shown on AR-capable devices -->
+  <button slot="ar-button" id="ar-btn">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+         xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <!-- AR scan-frame corner brackets -->
+      <path d="M3 8V4h4M17 4h4v4M21 16v4h-4M7 20H3v-4"
+            stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- 3-D cube -->
+      <path d="M12 9l3.5 2v4L12 17l-3.5-2v-4L12 9z"
+            stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="12" y1="9"  x2="12" y2="17" stroke="white" stroke-width="1.5"/>
+      <line x1="8.5" y1="11" x2="15.5" y2="11" stroke="white" stroke-width="1.5"/>
+    </svg>
+    View in Your Space
+  </button>
 
-<div slot="ar-prompt" style="
-position:absolute;
-bottom:90px;
-left:50%;
-transform:translateX(-50%);
-background:rgba(0,0,0,0.7);
-color:white;
-padding:10px 18px;
-border-radius:8px;
-font-size:14px;
-">
-
-👆 Tap to place • Use two fingers to rotate
-
-</div>
+  <!-- AR placement prompt -->
+  <div slot="ar-prompt" style="
+    position:absolute;
+    bottom:90px;
+    left:50%;
+    transform:translateX(-50%);
+    background:rgba(0,0,0,0.7);
+    color:white;
+    padding:10px 18px;
+    border-radius:8px;
+    font-size:14px;
+  ">
+    👆 Tap to place • Use two fingers to rotate
+  </div>
 
 </model-viewer>
 
+<!-- ── Progress bar ───────────────────────────────────────────────────── -->
 <div id="progress-bar-container">
   <div id="progress-bar"></div>
 </div>
 
+<!-- ── Error banner ───────────────────────────────────────────────────── -->
 <div id="error-banner">
   ⚠️ Could not load this model. Showing a default instead.
 </div>
 
-<!-- MODEL CAROUSEL -->
-
+<!-- ── Model carousel ─────────────────────────────────────────────────── -->
 <div class="slider">
   <div class="slides" id="carousel"></div>
 </div>
 
+<!-- ── Instructions ───────────────────────────────────────────────────── -->
 <div class="instructions">
-Tap "View in AR" → Point at table → Tap to place → Drag to move
+  Tap "View in AR" → Point at table → Tap to place → Drag to move
 </div>
 
-
-<script>
-
-/* ── RESTAURANT REGISTRY ─────────────────────────────────────────────────── */
-
-const RESTAURANT_REGISTRY = {
-  default: {
-    name: "AR Food Viewer",
-    color: "#ff6b35",
-    logo: "",
-    targetHeight: 0.20,                                           // V2.2: brand default 20 cm
-    models: [
-      { label: "Food",    file: "food.glb"                                      },
-      { label: "Samosa",  file: "Samosa2_opt.glb", targetHeight: 0.12           }, // 12 cm
-      { label: "Orange",  file: "Orange.glb",  targetHeight: 0.042              }, //  ~7 cm max
-      { label: "Chicken", file: "Chicken.glb",     targetHeight: 0.30           }  // 30 cm
-    ]
-  }
-  /* Add more brands here:
-  mcdonalds: {
-    name: "McDonald's",
-    color: "#DA291C",
-    logo: "https://example.com/mcdonalds-logo.png",
-    targetHeight: 0.20,
-    models: [
-      { label: "Burger", file: "burger.glb" },
-      { label: "Fries",  file: "fries.glb", targetHeight: 0.25, orientation: "0deg 0deg 0deg" }
-    ]
-  }
-  */
-};
-
-const FALLBACK_MODEL = "food.glb";
-
-/* ── URL PARAMETERS ──────────────────────────────────────────────────────── */
-
-const params    = new URLSearchParams(location.search);
-const brandId   = params.get("brand") || "default";
-const initModel = params.get("model");
-
-const config = RESTAURANT_REGISTRY[brandId] || RESTAURANT_REGISTRY["default"];
-
-/* ── ACTIVE MODEL STATE (V2) ─────────────────────────────────────────────── */
-
-let activeModelEntry = null;   // full registry entry for the current model
-let currentLoadId    = 0;      // V2.4: increments on every switchModel call
-let switchStartTime  = 0;      // V3.1: tracks model load duration
-
-/* ── V3.1: ANALYTICS ─────────────────────────────────────────────────────── */
-
-const _analytics = (() => {
-  const SESSION_KEY  = "ar_analytics_events";
-  const sessionStart = Date.now();
-  let arSessionStart = null;
-
-  let events = [];
-  try { events = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "[]"); } catch(_) {}
-
-  function save() {
-    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(events)); } catch(_) {}
-  }
-
-  function track(type, data = {}) {
-    const entry = { type, ts: Date.now(), ...data };
-    events.push(entry);
-    save();
-    console.log(`[V3.1] ${type}`, entry);
-  }
-
-  return {
-    modelView(model)                           { track("model_view",  { model }); },
-    modelLoad(model, dims, scale, durationMs)  { track("model_load",  { model, dims, scale, durationMs }); },
-    arStart(model) { arSessionStart = Date.now(); track("ar_start", { model }); },
-    arPlace(model) { track("ar_place", { model }); },
-    arEnd(model)   {
-      const dur = arSessionStart ? Date.now() - arSessionStart : null;
-      arSessionStart = null;
-      track("ar_end", { model, durationMs: dur });
-    },
-    arFail(model)  { track("ar_fail",  { model }); },
-
-    getReport() {
-      const views    = events.filter(e => e.type === "model_view");
-      const arStarts = events.filter(e => e.type === "ar_start");
-      const arEnds   = events.filter(e => e.type === "ar_end");
-      const avgArDur = arEnds.length
-        ? Math.round(arEnds.reduce((s, e) => s + (e.durationMs || 0), 0) / arEnds.length) : 0;
-      const report = {
-        sessionDurationMs: Date.now() - sessionStart,
-        totalModelViews:   views.length,
-        arActivations:     arStarts.length,
-        avgArDurationMs:   avgArDur,
-        modelViewCounts:   views.reduce((acc, e) => { acc[e.model] = (acc[e.model] || 0) + 1; return acc; }, {}),
-        allEvents: events,
-      };
-      console.table(report.modelViewCounts);
-      return report;
-    },
-
-    clear() {
-      events = [];
-      sessionStorage.removeItem(SESSION_KEY);
-      console.log("[V3.1] Analytics cleared.");
-    }
-  };
-})();
-
-window._arAnalytics = _analytics; // expose to DevTools: _arAnalytics.getReport()
-
-/* ── DOM REFS ────────────────────────────────────────────────────────────── */
-
-const modelViewer   = document.querySelector("#model");
-const loading       = document.querySelector("#loading");
-const carousel      = document.querySelector("#carousel");
-const progressBar   = document.querySelector("#progress-bar");
-const errorBanner   = document.querySelector("#error-banner");
-const brandName     = document.querySelector("#brand-name");
-const brandLogo     = document.querySelector("#brand-logo");
-
-/* ── BRANDING ────────────────────────────────────────────────────────────── */
-
-function applyBranding(cfg) {
-  document.title = cfg.name;
-  brandName.textContent = cfg.name;
-  document.documentElement.style.setProperty("--brand-color", cfg.color);
-
-  if (cfg.logo) {
-    brandLogo.src = cfg.logo;
-    brandLogo.style.display = "block";
-  }
-}
-
-/* ── CAROUSEL ────────────────────────────────────────────────────────────── */
-
-let buttons = [];
-
-function buildCarousel(cfg) {
-  carousel.innerHTML = "";
-  buttons = [];
-
-  cfg.models.forEach((item) => {
-    const btn = document.createElement("button");
-    btn.className = "slide";
-
-    // Thumbnail (pre-filled from sessionStorage cache if available)
-    const img = document.createElement("img");
-    img.className = "slide-thumb";
-    img.alt = item.label;
-    const cached = sessionStorage.getItem(`ar_thumb_${item.file}`);
-    img.src = cached || "";
-
-    // Placeholder cube icon shown until thumbnail is captured
-    const placeholder = document.createElement("div");
-    placeholder.className = "slide-thumb-placeholder";
-    placeholder.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-      <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-      <line x1="12" y1="3" x2="12" y2="21" stroke="white" stroke-width="1.5"/>
-      <line x1="4" y1="7.5" x2="20" y2="7.5" stroke="white" stroke-width="1.5"/>
-    </svg>`;
-
-    const label = document.createElement("span");
-    label.textContent = item.label;
-
-    btn.appendChild(img);
-    btn.appendChild(placeholder);
-    btn.appendChild(label);
-    btn.addEventListener("click", () => switchModel(btn, item));
-    carousel.appendChild(btn);
-    buttons.push(btn);
-  });
-}
-
-/* ── MODEL SWITCHING ─────────────────────────────────────────────────────── */
-
-function setButtonsDisabled(state) {
-  buttons.forEach(btn => { btn.disabled = state; });
-}
-
-function setSelected(btn) {
-  buttons.forEach(b => b.classList.remove("selected"));
-  btn.classList.add("selected");
-}
-
-function switchModel(btn, entryOrFile) {
-  // Accept full entry object (V2) or legacy string (fallback/init)
-  const entry = (typeof entryOrFile === "string")
-    ? config.models.find(m => m.file === entryOrFile) || { file: entryOrFile }
-    : entryOrFile;
-
-  activeModelEntry = entry;          // V2: track active model config
-  currentLoadId++;                   // V2.4: invalidate any in-flight load
-  modelViewer._expectedLoadId = currentLoadId;
-  _analytics.modelView(entry.file);  // V3.1: track model view
-
-  errorBanner.style.display = "none";
-  loading.style.display = "block";
-  progressBar.style.width = "0%";
-  setButtonsDisabled(true);
-  setSelected(btn);
-
-  modelViewer.scale       = "1 1 1";          // V2.2: reset to native scale for viewer
-  modelViewer.orientation = "0deg 0deg 0deg"; // V2.3: reset before each load
-  modelViewer.removeAttribute('camera-orbit');               // let model-viewer auto-frame
-  switchStartTime = Date.now();               // V3.1: start load timer
-  modelViewer.src = entry.file;
-}
-
-/* ── V2.3: AUTO ORIENTATION CORRECTION ───────────────────────────────────── */
-
-function applyOrientationCorrection(dims) {
-  const { x, y, z } = dims;
-  let effectiveDims = { x, y, z }; // may be remapped after rotation
-
-  // Per-model override: skip auto-detection entirely
-  if (activeModelEntry?.orientation != null) {
-    modelViewer.orientation = activeModelEntry.orientation;
-    const p = activeModelEntry.orientation.match(/-?\d+(\.\d+)?/g) || [0,0,0];
-
-    console.log(`[V2.3] Orientation override: ${activeModelEntry.orientation}`);
-    return effectiveDims;
-  }
-
-  // Heuristic: if Y (up-axis) is much smaller than X or Z, model is lying flat
-  const looksFlat = (y < x * 0.5) || (y < z * 0.5);
-
-  if (!looksFlat) {
-    modelViewer.orientation = "0deg 0deg 0deg";
-
-    console.log("[V2.3] Model upright — no correction needed.");
-    return effectiveDims;
-  }
-
-  // Determine which horizontal axis is tallest to pick the right rotation
-  if (z >= x) {
-    // Z is tallest: model lying on its back — rotate -90° around X
-    modelViewer.orientation = "-90deg 0deg 0deg";
-
-    effectiveDims = { x, y: z, z: y };  // Z becomes the visual height
-    console.log("[V2.3] Flat (Z-tallest) — applying -90deg X rotation.");
-  } else {
-    // X is tallest: model lying on its side — rotate 90° around Z
-    modelViewer.orientation = "0deg 0deg 90deg";
-
-    effectiveDims = { x: y, y: x, z };  // X becomes the visual height
-    console.log("[V2.3] Flat (X-tallest) — applying 90deg Z rotation.");
-  }
-
-  return effectiveDims;
-}
-
-/* ── V2.2: HEIGHT NORMALIZATION ──────────────────────────────────────────── */
-
-function applyHeightNormalization(effectiveDims) {
-  // Resolve target height: per-model > per-brand > hardcoded fallback (20 cm)
-  const targetHeight = activeModelEntry?.targetHeight ?? config.targetHeight ?? 0.20;
-  const modelHeight  = effectiveDims.y;  // effective Y after any orientation correction
-
-  if (modelHeight <= 0) {
-    console.warn("[V2.2] Effective Y is zero — skipping height normalization.");
-    return;
-  }
-
-  const scaleFactor = targetHeight / modelHeight;
-  const clamped     = Math.max(0.01, Math.min(scaleFactor, 10.0)); // safety clamp
-  const s           = clamped.toFixed(6);
-
-  // Store scale on entry for AR use only — viewer stays at native scale for correct auto-framing
-  if (activeModelEntry) activeModelEntry._arScale = `${s} ${s} ${s}`;
-
-  console.log(
-    `[V2.2] targetH=${targetHeight}m | modelY=${modelHeight.toFixed(4)}m | arScale=${s}`
-  );
-}
-
-/* ── PROGRESS ────────────────────────────────────────────────────────────── */
-
-modelViewer.addEventListener("progress", (e) => {
-  const pct = e.detail.totalProgress * 100;
-  progressBar.style.width = pct + "%";
-});
-
-/* ── LOAD COMPLETE ───────────────────────────────────────────────────────── */
-
-modelViewer.addEventListener("load", () => {
-  // V2.4: stale-load guard — ignore events from rapid model switching
-  if (modelViewer._expectedLoadId !== currentLoadId) {
-    console.log("[V2.4] Stale load event ignored.");
-    return;
-  }
-
-  // V2.1: read bounding box
-  const dims = modelViewer.getDimensions();
-
-  if (!dims || (dims.x === 0 && dims.y === 0 && dims.z === 0)) {
-    console.warn("[V2.1] getDimensions() returned zero — skipping normalization.");
-    _analytics.modelLoad(activeModelEntry?.file, null, null, Date.now() - switchStartTime); // V3.1
-  } else {
-    console.log(
-      `[V2.1] Raw dims (m): X=${dims.x.toFixed(4)} Y=${dims.y.toFixed(4)} Z=${dims.z.toFixed(4)}`
-    );
-    modelViewer._lastDimensions = dims; // expose for DevTools inspection
-
-    const effectiveDims = applyOrientationCorrection(dims); // V2.3 first
-    applyHeightNormalization(effectiveDims);                 // V2.2 second
-
-    // V3.1: track load completion with dims + scale + duration
-    _analytics.modelLoad(
-      activeModelEntry?.file,
-      { x: +dims.x.toFixed(4), y: +dims.y.toFixed(4), z: +dims.z.toFixed(4) },
-      modelViewer.scale,
-      Date.now() - switchStartTime
-    );
-  }
-
-  // V1 UI updates (unchanged)
-  loading.style.display = "none";
-  progressBar.style.width = "100%";
-  setButtonsDisabled(false);
-  setTimeout(() => { progressBar.style.width = "0%"; }, 400);
-
-  // V3.2: auto-capture thumbnail from canvas
-  const _thumbEntry = activeModelEntry;
-  setTimeout(() => {
-    if (!_thumbEntry) return;
-    try {
-      const dataUrl = modelViewer.toDataURL('image/jpeg', 0.6);
-      const idx = config.models.indexOf(_thumbEntry);
-      if (idx >= 0 && buttons[idx]) {
-        const img = buttons[idx].querySelector('.slide-thumb');
-        if (img) img.src = dataUrl;
-      }
-      try { sessionStorage.setItem(`ar_thumb_${_thumbEntry.file}`, dataUrl); } catch(_) {}
-      console.log(`[V3.2] Thumbnail captured: ${_thumbEntry.file}`);
-    } catch(e) { console.log('[V3.2] toDataURL skipped:', e.message); }
-  }, 150);
-});
-
-/* ── ERROR HANDLING ──────────────────────────────────────────────────────── */
-
-modelViewer.addEventListener("error", () => {
-  errorBanner.style.display = "block";
-  loading.style.display = "none";
-  setButtonsDisabled(false);
-
-  if (modelViewer.src !== FALLBACK_MODEL) {
-    modelViewer.src = FALLBACK_MODEL;
-    const fallbackBtn = buttons.find(b =>
-      b.textContent === config.models.find(m => m.file === FALLBACK_MODEL)?.label
-    );
-    if (fallbackBtn) setSelected(fallbackBtn);
-  }
-});
-
-/* ── INIT ────────────────────────────────────────────────────────────────── */
-
-applyBranding(config);
-buildCarousel(config);
-
-// Pick initial model: URL param > first in list
-const initEntry = config.models.find(m =>
-  m.file === initModel || m.label.toLowerCase() === (initModel || "").toLowerCase()
-) || config.models[0];
-
-switchModel(buttons[config.models.indexOf(initEntry)], initEntry); // V2: pass full entry
-
-/* ── V3.1: AR STATUS TRACKING ────────────────────────────────────────────── */
-
-/* ── V2.2: Apply physical AR scale on button click, restore on exit ──────── */
-document.getElementById('ar-btn').addEventListener('click', () => {
-  if (activeModelEntry?._arScale) modelViewer.scale = activeModelEntry._arScale;
-});
-
-modelViewer.addEventListener("ar-status", (e) => {
-  const model  = activeModelEntry?.file || "unknown";
-  const status = e.detail.status;
-
-  if (status === "not-presenting") {
-    modelViewer.scale = "1 1 1"; // V2.2: restore native scale for viewer
-  }
-
-  /* ── V3.1: ANALYTICS ─────────────────────────────────────────────────── */
-  switch (status) {
-    case "session-started": _analytics.arStart(model); break;
-    case "object-placed":   _analytics.arPlace(model); break;
-    case "not-presenting":  _analytics.arEnd(model);   break;
-    case "failed":          _analytics.arFail(model);  break;
-  }
-});
-
-/* ── PREVENT CAROUSEL TOUCHES FROM TRIGGERING AR ─────────────────────────── */
-
-document.querySelector(".slider").addEventListener("beforexrselect", (ev) => {
-  ev.preventDefault();
-});
-
-</script>
+<!-- ── Application logic ──────────────────────────────────────────────── -->
+<script src="app.js"></script>
 
 </body>
 </html>
