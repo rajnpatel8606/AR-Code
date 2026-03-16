@@ -53,8 +53,8 @@ const RESTAURANTS = {
     targetHeight: 0.20,          // 20 cm brand-wide default
     models: [
       { label: 'Food',    file: 'assets/food.glb'                                       },
-      { label: 'Cheese Balls',  file: 'assets/Cheese Balls.glb', targetHeight: 0.12 , orientation: '0deg 0deg 0deg'           }, // 12 cm
-      { label: 'Samosa Plate',  file: 'assets/Samosa Plate LA.glb', targetHeight: 0.12 , orientation: '0deg 0deg 0deg'           },
+      { label: 'Cheese Balls',  file: 'assets/Cheese Balls.glb',    targetHeight: 0.12  },
+      { label: 'Samosa Plate',  file: 'assets/Samosa Plate LA.glb', targetHeight: 0.12  },
       { label: 'Orange',  file: 'assets/Orange.glb',       targetHeight: 0.042          }, // ~4 cm
       { label: 'Chicken',     file: 'assets/Chicken.glb',    targetHeight: 0.30  }, // 30 cm
       { label: 'CMF Earbuds', file: 'assets/CMFEarbuds.glb',  targetHeight: 0.07  }  //  7 cm
@@ -257,8 +257,17 @@ const ThemeEngine = {
 const ModelNormalization = {
 
   /**
-   * V2.3 — Auto orientation correction.
-   * Detects flat-lying models and rotates them upright.
+   * V2.6 — Auto orientation correction.
+   *
+   * Priority:
+   *   1. Manual registry override  (entry.orientation)
+   *   2. Auto-detected from GLB root rotation  (entry._detectedOrientation)
+   *   3. No correction (default)
+   *
+   * The old bounding-box heuristic (looksFlat) has been removed.
+   * It caused false positives on flat food models (e.g. plates) and missed
+   * embedded-rotation issues on Meshy-generated models.  The GLB probe
+   * (probeGlbRootRotation) is the reliable replacement.
    *
    * @param  {DOMPointReadOnly} dims  Raw bounding box {x,y,z} from getDimensions()
    * @param  {object}  entry          Active model registry entry
@@ -267,37 +276,83 @@ const ModelNormalization = {
    */
   applyOrientationCorrection(dims, entry, mv) {
     const { x, y, z } = dims;
-    let effectiveDims = { x, y, z };
 
-    // Per-model manual override — skip heuristic entirely
-    if (entry && entry.orientation != null) {
+    // 1. Manual registry override — highest priority
+    if (entry?.orientation != null) {
       mv.orientation = entry.orientation;
-      console.log(`[V2.3] Orientation override: ${entry.orientation}`);
-      return effectiveDims;
+      console.log(`[V2.6] Manual orientation override: ${entry.orientation}`);
+      return { x, y, z };   // caller supplied override; trust its dimensions as-is
     }
 
-    // Heuristic: if Y (up-axis) is much smaller than X or Z the model is lying flat
-    const looksFlat = (y < x * 0.5) || (y < z * 0.5);
-
-    if (!looksFlat) {
-      mv.orientation = '0deg 0deg 0deg';
-      console.log('[V2.3] Model upright — no correction needed.');
-      return effectiveDims;
+    // 2. Auto-detected orientation from GLB probe (null/undefined = not ready, skip)
+    const detected = entry?._detectedOrientation;
+    if (detected != null) {   // != null is false for both null AND undefined
+      mv.orientation = detected;
+      console.log(`[V2.6] Auto-detected orientation: ${detected}`);
+      // If the model had an embedded −90° X root rotation (Meshy pattern), the
+      // world-space bounding box has Y and Z swapped vs the model's true shape.
+      // Applying +90° X counteracts it — swap Y↔Z to get correct effective dims.
+      if (detected === '90deg 0deg 0deg') return { x, y: z, z: y };
+      return { x, y, z };
     }
 
-    if (z >= x) {
-      // Z is tallest: model lying on its back — rotate -90° around X axis
-      mv.orientation = '-90deg 0deg 0deg';
-      effectiveDims  = { x, y: z, z: y };   // Z becomes visual height
-      console.log('[V2.3] Flat (Z-tallest) — applying -90deg X rotation.');
-    } else {
-      // X is tallest: model lying on its side — rotate 90° around Z axis
-      mv.orientation = '0deg 0deg 90deg';
-      effectiveDims  = { x: y, y: x, z };   // X becomes visual height
-      console.log('[V2.3] Flat (X-tallest) — applying 90deg Z rotation.');
-    }
+    // 3. No correction available yet (probe still in-flight or probe not started)
+    mv.orientation = '0deg 0deg 0deg';
+    console.log('[V2.6] No orientation data yet — using identity.');
+    return { x, y, z };
+  },
 
-    return effectiveDims;
+  /**
+   * V2.6 — Probe a GLB file's root-node rotation quaternion.
+   *
+   * Fetches the GLB (uses the browser cache — same URL model-viewer is loading),
+   * parses only the JSON chunk, and checks if the scene root node contains the
+   * well-known Meshy "orientation_correction" −90° X rotation.
+   *
+   * Returns a model-viewer orientation string that counteracts the embedded
+   * rotation, or '0deg 0deg 0deg' if no problematic rotation is detected.
+   *
+   * @param  {string} file  Relative path to the .glb file
+   * @returns {Promise<string>}
+   */
+  async probeGlbRootRotation(file) {
+    try {
+      const resp = await fetch(file);
+      const buf  = await resp.arrayBuffer();
+      const view = new DataView(buf);
+
+      // Validate GLB magic 0x46546C67 ('glTF' little-endian)
+      if (view.getUint32(0, true) !== 0x46546C67) return '0deg 0deg 0deg';
+
+      const jsonLen = view.getUint32(12, true);
+      const jsonStr = new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen));
+      const json    = JSON.parse(jsonStr);
+
+      const sceneRootIds = json.scenes?.[json.scene ?? 0]?.nodes ?? [];
+
+      for (const id of sceneRootIds) {
+        const node = json.nodes?.[id];
+        if (!node?.rotation) continue;
+
+        const [qx, qy, qz, qw] = node.rotation;
+
+        // Meshy −90° X pattern: quaternion ≈ (−0.7071, 0, 0, +0.7071)
+        // This erroneously tilts an already-correct Y-up mesh sideways.
+        // Counteract with +90° X orientation.
+        if (Math.abs(qx + 0.7071) < 0.01 && Math.abs(qw - 0.7071) < 0.01
+            && Math.abs(qy) < 0.01 && Math.abs(qz) < 0.01) {
+          console.log(`[V2.6] Probe "${file}": Meshy −90°X root detected → applying +90°X counteraction`);
+          return '90deg 0deg 0deg';
+        }
+      }
+
+      console.log(`[V2.6] Probe "${file}": no problematic root rotation → identity`);
+      return '0deg 0deg 0deg';
+
+    } catch (e) {
+      console.warn('[V2.6] GLB probe failed:', e.message);
+      return '0deg 0deg 0deg';
+    }
   },
 
   /**
@@ -398,6 +453,17 @@ const ModelLoader = {
     this._mv.orientation = '0deg 0deg 0deg'; // reset before each load
     this._mv.removeAttribute('camera-orbit'); // let model-viewer auto-frame
 
+    // V2.6: kick off GLB root-rotation probe concurrently with the model load.
+    // The probe fetches the same URL model-viewer is about to request, so the
+    // browser deduplicates or cache-hits — no extra network cost.
+    // Result is cached on the entry so subsequent loads of the same model are instant.
+    // undefined = not probed yet | null = probe in-flight | string = result ready
+    if (entry.orientation == null && entry._detectedOrientation === undefined) {
+      entry._detectedOrientation = null;   // mark in-flight (prevents duplicate probes)
+      entry._probePromise = ModelNormalization.probeGlbRootRotation(entry.file)
+        .then(result => { entry._detectedOrientation = result; });
+    }
+
     this.switchStartTime = Date.now();        // V3.1: start load timer
     this._mv.src = entry.file;
   },
@@ -427,13 +493,26 @@ const ModelLoader = {
       );
       mv._lastDimensions = dims; // expose for DevTools: modelViewer._lastDimensions
 
-      // Step 2: orientation correction (V2.3)
-      const effectiveDims = ModelNormalization.applyOrientationCorrection(
-        dims, this.activeEntry, mv
-      );
+      // V2.6: run normalization once orientation probe is settled.
+      // If the probe already resolved (cache hit), this runs synchronously via
+      // Promise.resolve(). If still in-flight, we wait for it — the brief delay
+      // is invisible because the model is still fading in at this point.
+      const runNormalization = () => {
+        // Step 2: orientation correction (V2.6 — GLB probe replaces looksFlat heuristic)
+        const effectiveDims = ModelNormalization.applyOrientationCorrection(
+          dims, this.activeEntry, mv
+        );
+        // Steps 3–5: compute AR scale (V2.2 + V2.5 width constraint)
+        ModelNormalization.computeArScale(effectiveDims, this.activeEntry, this._config);
+      };
 
-      // Steps 3–5: compute AR scale (V2.2 + V2.5 width constraint)
-      ModelNormalization.computeArScale(effectiveDims, this.activeEntry, this._config);
+      const probe = this.activeEntry?._probePromise;
+      if (probe && this.activeEntry?._detectedOrientation === null) {
+        // null = probe still in-flight; wait for it then normalise
+        probe.then(runNormalization);
+      } else {
+        runNormalization();
+      }
 
       // V3.1: log load completion
       AnalyticsTracker.modelLoad(
