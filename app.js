@@ -53,7 +53,7 @@ const RESTAURANTS = {
     targetHeight: 0.20,          // 20 cm brand-wide default
     models: [
       { label: 'Food',    file: 'assets/food.glb'                                       },
-      { label: 'Cheese Balls',  file: 'assets/Cheese Balls.glb',    targetHeight: 0.12  },
+      { label: 'Cold Coffee',  file: 'assets/Cold Coffee.glb',    targetHeight: 0.12  },
       { label: 'Samosa Plate',  file: 'assets/Samosa Plate LA.glb', targetHeight: 0.12  },
       { label: 'Orange',  file: 'assets/Orange.glb',       targetHeight: 0.042          }, // ~4 cm
       { label: 'Chicken',     file: 'assets/Chicken.glb',    targetHeight: 0.30  }, // 30 cm
