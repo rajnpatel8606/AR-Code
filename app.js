@@ -46,14 +46,14 @@ const RESTAURANTS = {
   default: {
     name:         'AR Food Viewer',
     logo:         '',
-    primary:      '#ff6b35',
-    primaryDark:  '#e55a2b',
-    bg:           '#111111',
-    surface:      '#1a1a1a',
+    primary:      '#b5451b',   // warm terracotta
+    primaryDark:  '#8f3614',   // darker for hover/glow
+    bg:           '#faf7f2',   // warm cream page background
+    surface:      '#ffffff',   // white card/panel surfaces
     targetHeight: 0.20,          // 20 cm brand-wide default
     models: [
       { label: 'Food',    file: 'assets/food.glb'                                       },
-      { label: 'Cold Coffee',  file: 'assets/Cold Coffee.glb',    targetHeight: 0.12  },
+      { label: 'Cold Coffee',  file: 'assets/Cold Cofee.glb',     targetHeight: 0.12  },
       { label: 'Samosa Plate',  file: 'assets/Samosa Plate LA.glb', targetHeight: 0.12  },
       { label: 'Orange',  file: 'assets/Orange.glb',       targetHeight: 0.042          }, // ~4 cm
       { label: 'Chicken',     file: 'assets/Chicken.glb',    targetHeight: 0.30  }, // 30 cm
