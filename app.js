@@ -57,7 +57,7 @@ const RESTAURANTS = {
       { label: 'Samosa Plate',  file: 'assets/Samosa Plate LA.glb', targetHeight: 0.12  },
       { label: 'Orange',  file: 'assets/Orange.glb',       targetHeight: 0.042          }, // ~4 cm
       { label: 'Chicken',     file: 'assets/Chicken.glb',    targetHeight: 0.30  }, // 30 cm
-      { label: 'CMF Earbuds', file: 'assets/CMFEarbuds.glb',  targetHeight: 0.07  }  //  7 cm
+      { label: 'Cheese Balls', file: 'assets/Cheese Balls 2.glb',  targetHeight: 0.07  }  //  7 cm
     ]
   },
 
