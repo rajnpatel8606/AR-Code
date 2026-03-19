@@ -62,27 +62,27 @@ const RESTAURANTS = {
       {
         id: 'beverages', label: 'Beverages',
         models: [
-          { label: 'Cold Coffee',  file: 'assets/Cold Cofee.glb',      thumb: 'assets/thumbs/cold-coffee.jpg'  },
+          { label: 'Cold Coffee',  file: 'assets/Cold Cofee.glb',      thumb: 'assets/thumbs/cold-coffee.png'  },
         ]
       },
       {
         id: 'starters', label: 'Starters',
         models: [
-          { label: 'Samosa Plate', file: 'assets/Samosa Plate LA.glb', thumb: 'assets/thumbs/samosa-plate.jpg' },
-          { label: 'Cheese Balls', file: 'assets/Cheese Balls 2.glb',  thumb: 'assets/thumbs/cheese-balls.jpg' },
+          { label: 'Samosa Plate', file: 'assets/Samosa Plate LA.glb', thumb: 'assets/thumbs/samosa-plate.png' },
+          { label: 'Cheese Balls', file: 'assets/Cheese Balls 2.glb',  thumb: 'assets/thumbs/cheese-balls.png' },
         ]
       },
       {
         id: 'main-course', label: 'Main Course',
         models: [
-          { label: 'Burger',       file: 'assets/food.glb',            thumb: 'assets/thumbs/food.jpg'         },
-          { label: 'Chicken',      file: 'assets/Chicken.glb',         thumb: 'assets/thumbs/chicken.jpg'      },
+          { label: 'Burger',       file: 'assets/food.glb',            thumb: 'assets/thumbs/food.png'         },
+          { label: 'Chicken',      file: 'assets/Chicken.glb',         thumb: 'assets/thumbs/chicken.png'      },
         ]
       },
       {
         id: 'salads', label: 'Salads',
         models: [
-          { label: 'Fruit Salad',  file: 'assets/Fruit Salad.glb',     thumb: 'assets/thumbs/fruit-salad.jpg'  },
+          { label: 'Fruit Salad',  file: 'assets/Fruit Salad.glb',     thumb: 'assets/thumbs/fruit-salad.png'  },
         ]
       },
     ]
