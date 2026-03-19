@@ -10,11 +10,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
+<!-- V1: Preload first model GLB so it starts fetching before JS runs -->
+<link rel="preload" as="fetch" href="assets/food.glb">
+
 <!-- model-viewer WebXR component -->
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
 
 <!-- App styles (CSS variables + all layout/UI rules) -->
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 
 <body>
@@ -91,6 +94,9 @@
 <div id="error-banner">
   ⚠️ Could not load this model. Showing a default instead.
 </div>
+
+<!-- ── V2: Category tabs (populated by CarouselController.buildTabs()) ──── -->
+<div id="category-tabs"></div>
 
 <!-- ── Model carousel ─────────────────────────────────────────────────── -->
 <div class="slider">

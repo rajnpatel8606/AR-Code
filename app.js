@@ -10,9 +10,13 @@
  *   3. THEME ENGINE          — CSS variable theming + branding DOM
  *   4. MODEL NORMALIZATION   — removed; baked into GLBs by AR-3D-Pipeline
  *   5. MODEL LOADER          — V2.4 stale-load guard, load/error/progress
- *   6. CAROUSEL CONTROLLER   — V3.2 thumbnail cards, selection state
+ *   6. CAROUSEL CONTROLLER   — V3.2 thumbnail cards + V2 category tabs
  *   7. AR SESSION MANAGER    — AR scale apply/restore + ar-status events
  *   8. INIT                  — single boot function
+ *
+ * Changes:
+ *   V1 Performance: static thumbnail preloading, next-model prefetch
+ *   V2 Category Tabs: models grouped into Beverages/Starters/Main Course/Salads
  */
 
 'use strict';
@@ -29,12 +33,15 @@
      bg            — page background colour
      surface       — card / viewer background colour
      targetHeight  — brand-wide AR height default in metres (per-model can override)
-     models[]      — list of 3D models for this restaurant's carousel
-       .label        — display label on carousel card
-       .file         — GLB filename (resolved relative to index.html)
-       .targetHeight — (optional) per-model height override in metres
-       .targetWidth  — (optional) per-model width override in metres
-       .orientation  — (optional) manual Euler override, e.g. "0deg 0deg 0deg"
+     categories[]  — V2: models grouped into named tabs
+       .id           — unique tab identifier
+       .label        — tab display label
+       .models[]     — list of 3D models for this category
+         .label        — display label on carousel card
+         .file         — GLB filename (resolved relative to index.html)
+         .thumb        — V1: optional static thumbnail image (preloaded instantly)
+         .targetHeight — (optional) per-model height override in metres
+     models[]      — flat list (used by brands without tabs, backward-compatible)
 
    URL parameters:
      ?brand=X  — select a restaurant (alias: ?r=X for backward-compatibility)
@@ -50,14 +57,35 @@ const RESTAURANTS = {
     primaryDark:  '#8f3614',   // darker for hover/glow
     bg:           '#faf7f2',   // warm cream page background
     surface:      '#ffffff',   // white card/panel surfaces
-    models: [
-      { label: 'Burger',       file: 'assets/food.glb'                  },
-      { label: 'Cold Coffee',  file: 'assets/Cold Cofee.glb'            },
-      { label: 'Samosa Plate', file: 'assets/Samosa Plate LA.glb'       },
-      { label: 'Orange',       file: 'assets/Orange.glb'                },
-      { label: 'Chicken',      file: 'assets/Chicken.glb'               },
-      { label: 'Cheese Balls', file: 'assets/Cheese Balls 2.glb'        },
-      { label: 'Fruit Salad',  file: 'assets/Fruit Salad.glb'           },
+    // V2: models grouped into category tabs
+    categories: [
+      {
+        id: 'beverages', label: 'Beverages',
+        models: [
+          { label: 'Cold Coffee',  file: 'assets/Cold Cofee.glb',      thumb: 'assets/thumbs/cold-coffee.jpg'  },
+        ]
+      },
+      {
+        id: 'starters', label: 'Starters',
+        models: [
+          { label: 'Samosa Plate', file: 'assets/Samosa Plate LA.glb', thumb: 'assets/thumbs/samosa-plate.jpg' },
+          { label: 'Cheese Balls', file: 'assets/Cheese Balls 2.glb',  thumb: 'assets/thumbs/cheese-balls.jpg' },
+        ]
+      },
+      {
+        id: 'main-course', label: 'Main Course',
+        models: [
+          { label: 'Burger',       file: 'assets/food.glb',            thumb: 'assets/thumbs/food.jpg'         },
+          { label: 'Chicken',      file: 'assets/Chicken.glb',         thumb: 'assets/thumbs/chicken.jpg'      },
+        ]
+      },
+      {
+        id: 'salads', label: 'Salads',
+        models: [
+          { label: 'Fruit Salad',  file: 'assets/Fruit Salad.glb',     thumb: 'assets/thumbs/fruit-salad.jpg'  },
+          { label: 'Orange',       file: 'assets/Orange.glb',           thumb: 'assets/thumbs/orange.jpg'       },
+        ]
+      },
     ]
   },
 
@@ -122,6 +150,15 @@ const RESTAURANTS = {
 
 /** File to load if a model errors and no better fallback exists */
 const FALLBACK_MODEL = 'assets/food.glb';
+
+/**
+ * V1 utility: get a flat array of all models from a config.
+ * Handles both categories (V2) and flat models (backward-compat) brands.
+ */
+function getModels(cfg) {
+  if (cfg.categories) return cfg.categories.flatMap(c => c.models);
+  return cfg.models || [];
+}
 
 /* ══════════════════════════════════════════════════════════════════════════════
    MODULE 2 — ANALYTICS TRACKER  (V3.1)
@@ -255,7 +292,8 @@ const ThemeEngine = {
      • V2.4 stale-load guard: currentLoadId increments on every switchModel().
        The load handler ignores events from previous (cancelled) switches.
      • Models are pre-normalized by pipeline — no bounding box reads needed.
-     • V3.2 thumbnail capture: toDataURL() at 150 ms after load.
+     • V3.2 thumbnail capture: toDataURL() at 150 ms after load (fallback).
+     • V1 next-model prefetch: queues preload link for next carousel model.
    ══════════════════════════════════════════════════════════════════════════════ */
 
 const ModelLoader = {
@@ -275,7 +313,7 @@ const ModelLoader = {
   switchModel(btn, entryOrFile) {
     const config = this._config;
     const entry  = (typeof entryOrFile === 'string')
-      ? config.models.find(m => m.file === entryOrFile) || { file: entryOrFile }
+      ? getModels(config).find(m => m.file === entryOrFile) || { file: entryOrFile }
       : entryOrFile;
 
     this.activeEntry      = entry;
@@ -314,7 +352,7 @@ const ModelLoader = {
       Date.now() - this.switchStartTime
     );
 
-    // V1 UI updates
+    // UI updates
     document.querySelector('#loading').style.display    = 'none';
     document.querySelector('#progress-bar').style.width = '100%';
     CarouselController.setDisabled(false);
@@ -322,17 +360,19 @@ const ModelLoader = {
       document.querySelector('#progress-bar').style.width = '0%';
     }, 400);
 
-    // V3.2: auto-capture thumbnail from canvas at 150 ms
+    // V3.2: auto-capture thumbnail from canvas at 150 ms (fallback for models without static thumb)
     const captureEntry = this.activeEntry;
-    const captureConfig = this._config;
     setTimeout(() => {
       if (!captureEntry) return;
       try {
         const dataUrl = mv.toDataURL('image/jpeg', 0.6);
-        const idx = captureConfig.models.indexOf(captureEntry);
-        if (idx >= 0 && CarouselController.buttons[idx]) {
-          const img = CarouselController.buttons[idx].querySelector('.slide-thumb');
-          if (img) img.src = dataUrl;
+        const btn = CarouselController.buttonMap.get(captureEntry);
+        if (btn) {
+          const img = btn.querySelector('.slide-thumb');
+          // Only update if no static thumb is already showing
+          if (img && !img.dataset.staticThumb) {
+            img.src = dataUrl;
+          }
         }
         try { sessionStorage.setItem(`ar_thumb_${captureEntry.file}`, dataUrl); } catch (_) {}
         console.log(`[V3.2] Thumbnail captured: ${captureEntry.file}`);
@@ -340,6 +380,23 @@ const ModelLoader = {
         console.log('[V3.2] toDataURL skipped:', e.message);
       }
     }, 150);
+
+    // V1: prefetch next model in the current category carousel
+    const visibleModels = CarouselController._currentModels;
+    if (visibleModels.length > 1) {
+      const curIdx = visibleModels.indexOf(captureEntry);
+      if (curIdx >= 0) {
+        const next = visibleModels[(curIdx + 1) % visibleModels.length];
+        if (!document.head.querySelector(`link[href="${next.file}"][rel="preload"]`)) {
+          const link = document.createElement('link');
+          link.rel = 'preload';
+          link.as  = 'fetch';
+          link.href = next.file;
+          document.head.appendChild(link);
+          console.log(`[V1] Prefetch queued: ${next.file}`);
+        }
+      }
+    }
   },
 
   /** model-viewer 'error' event handler */
@@ -351,12 +408,10 @@ const ModelLoader = {
     // Fallback to default model if not already showing it
     if (this._mv.src !== FALLBACK_MODEL) {
       this._mv.src = FALLBACK_MODEL;
-      const fallbackEntry = this._config.models.find(m => m.file === FALLBACK_MODEL);
+      const fallbackEntry = getModels(this._config).find(m => m.file === FALLBACK_MODEL);
       if (fallbackEntry) {
-        const idx = this._config.models.indexOf(fallbackEntry);
-        if (CarouselController.buttons[idx]) {
-          CarouselController.setSelected(CarouselController.buttons[idx]);
-        }
+        const btn = CarouselController.buttonMap.get(fallbackEntry);
+        if (btn) CarouselController.setSelected(btn);
       }
     }
   },
@@ -380,38 +435,57 @@ const ModelLoader = {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   MODULE 6 — CAROUSEL CONTROLLER  (V3.2)
+   MODULE 6 — CAROUSEL CONTROLLER  (V3.2 thumbnails + V2 category tabs)
    ══════════════════════════════════════════════════════════════════════════════
    Builds the model-selector carousel from the restaurant config.
    Each card has:
-     • A thumbnail <img>  — auto-captured after load; pre-filled from sessionStorage
+     • A thumbnail <img>  — V1: static thumb (instant) or sessionStorage cache;
+                            V3.2: auto-captured via toDataURL after model loads
      • A placeholder icon — shown while thumbnail is not yet available
      • A text label       — from model entry .label
+
+   V2 additions:
+     • buildTabs(cfg)       — renders category tab row from cfg.categories
+     • showCategory(id,cfg) — switches tab + rebuilds carousel for that category
+     • buttonMap            — Map<entry, button> for O(1) lookup by model entry
    ══════════════════════════════════════════════════════════════════════════════ */
 
 const CarouselController = {
 
-  buttons: [],
+  buttons:        [],           // currently visible carousel buttons
+  buttonMap:      new Map(),    // entry → button (persists across category switches)
+  _currentModels: [],           // currently visible models array
+  _tabButtons:    [],           // category tab <button> elements
 
   /**
-   * Build (or rebuild) carousel from config.models.
-   * @param {object} cfg  Restaurant config object
+   * Build (or rebuild) carousel from an array of model entries.
+   * Called directly for flat-models brands, or by showCategory() for tabs.
+   * @param {object[]} models  Array of model entry objects
    */
-  build(cfg) {
+  build(models) {
     const carousel = document.querySelector('#carousel');
     carousel.innerHTML = '';
     this.buttons = [];
+    this._currentModels = models;
 
-    cfg.models.forEach((item) => {
+    models.forEach((item) => {
       const btn = document.createElement('button');
       btn.className = 'slide';
 
-      // Thumbnail — pre-fill from sessionStorage if captured this session
+      // Thumbnail — V1 priority order:
+      //   1. Static thumb image (instant display, preloaded into browser cache)
+      //   2. sessionStorage capture from previous session
+      //   3. Empty src (placeholder shows; toDataURL fills it in after load)
       const img = document.createElement('img');
       img.className = 'slide-thumb';
       img.alt = item.label;
-      const cached = sessionStorage.getItem(`ar_thumb_${item.file}`);
-      img.src = cached || '';
+      if (item.thumb) {
+        img.src = item.thumb;
+        img.dataset.staticThumb = '1'; // flag: don't overwrite with toDataURL
+      } else {
+        const cached = sessionStorage.getItem(`ar_thumb_${item.file}`);
+        img.src = cached || '';
+      }
 
       // Placeholder cube icon shown until thumbnail is available
       const placeholder = document.createElement('div');
@@ -434,7 +508,63 @@ const CarouselController = {
 
       carousel.appendChild(btn);
       this.buttons.push(btn);
+      this.buttonMap.set(item, btn); // track for thumbnail capture + error fallback
+
+      // V1: warm browser image cache for static thumbnails
+      if (item.thumb) {
+        const preload = new Image();
+        preload.src = item.thumb;
+      }
     });
+  },
+
+  /**
+   * V2: Build the category tab row from cfg.categories.
+   * Clears previous tabs. Call once per restaurant config.
+   * @param {object} cfg  Restaurant config with .categories[]
+   */
+  buildTabs(cfg) {
+    this.buttonMap.clear();
+    this._tabButtons = [];
+
+    const tabsEl = document.querySelector('#category-tabs');
+    tabsEl.innerHTML = '';
+
+    // Mark slider so CSS hides the "Our Dishes" pseudo-element
+    document.querySelector('.slider').classList.add('has-tabs');
+
+    cfg.categories.forEach((cat) => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-tab';
+      btn.textContent = cat.label;
+      btn.addEventListener('click', () => this.showCategory(cat.id, cfg));
+      tabsEl.appendChild(btn);
+      this._tabButtons.push(btn);
+    });
+  },
+
+  /**
+   * V2: Switch to a category tab, rebuild carousel, auto-load first model.
+   * @param {string} catId   Category id from cfg.categories
+   * @param {object} cfg     Restaurant config
+   */
+  showCategory(catId, cfg) {
+    const catIndex = cfg.categories.findIndex(c => c.id === catId);
+    if (catIndex < 0) return;
+    const cat = cfg.categories[catIndex];
+
+    // Update active tab highlight
+    this._tabButtons.forEach((b, i) => {
+      b.classList.toggle('active', i === catIndex);
+    });
+
+    // Rebuild carousel for this category's models
+    this.build(cat.models);
+
+    // Auto-load first model in the new category
+    if (cat.models.length > 0) {
+      ModelLoader.switchModel(this.buttons[0], cat.models[0]);
+    }
   },
 
   /** Mark one button as selected; clear all others */
@@ -510,9 +640,9 @@ function parseURL() {
      1. parseURL()              — read brand + model from query string
      2. loadRestaurantConfig()  — look up (or fall back to) RESTAURANTS entry
      3. ThemeEngine.apply()     — CSS vars + branding DOM
-     4. CarouselController.build() — build thumbnail cards
-     5. ModelLoader.init()      — attach load/error/progress listeners
-     6. ARSessionManager.init() — attach AR button + ar-status listeners
+     4. ModelLoader.init()      — attach load/error/progress listeners
+     5. ARSessionManager.init() — attach AR button + ar-status listeners
+     6. buildCarousel()         — tabs (V2) or flat carousel (backward compat)
      7. loadInitialModel()      — switch to URL-specified or first model
    ══════════════════════════════════════════════════════════════════════════════ */
 
@@ -531,26 +661,54 @@ function init() {
   // Step 3: apply theme
   ThemeEngine.apply(config);
 
-  // Step 4: build carousel (requires config.models)
-  CarouselController.build(config);
-
-  // Step 5: init model loader listeners
+  // Steps 4 + 5: init model loader and AR manager BEFORE any switchModel call
   ModelLoader.init(mv, config);
-
-  // Step 6: init AR session manager listeners
   ARSessionManager.init(mv);
 
-  // Step 7: select initial model (URL param > first in list)
-  const initEntry = config.models.find(m =>
-    m.file === initModel ||
-    m.label.toLowerCase() === (initModel || '').toLowerCase()
-  ) || config.models[0];
+  // Steps 6 + 7: build carousel and load initial model
+  if (config.categories) {
+    // V2: category tabs
+    CarouselController.buildTabs(config);
 
-  if (initEntry) {
-    const initBtn = CarouselController.buttons[config.models.indexOf(initEntry)];
-    ModelLoader.switchModel(initBtn, initEntry);
+    const allModels = getModels(config);
+    const initEntry = allModels.find(m =>
+      m.file === initModel ||
+      m.label.toLowerCase() === (initModel || '').toLowerCase()
+    );
+
+    if (initEntry) {
+      // Navigate to the category that contains the requested model
+      const initCat = config.categories.find(c => c.models.includes(initEntry));
+      const firstCatId = initCat ? initCat.id : config.categories[0].id;
+      CarouselController.showCategory(firstCatId, config);
+
+      // showCategory already loads the first model in the category;
+      // if the requested model is different, switch to it explicitly
+      if (initCat && initEntry !== initCat.models[0]) {
+        const btn = CarouselController.buttonMap.get(initEntry);
+        if (btn) ModelLoader.switchModel(btn, initEntry);
+      }
+    } else {
+      // No URL param — show first category
+      CarouselController.showCategory(config.categories[0].id, config);
+    }
+
   } else {
-    console.warn('[Init] No models configured for this restaurant.');
+    // Backward compat: flat models list (other brands)
+    const models = getModels(config);
+    CarouselController.build(models);
+
+    const initEntry = models.find(m =>
+      m.file === initModel ||
+      m.label.toLowerCase() === (initModel || '').toLowerCase()
+    ) || models[0];
+
+    if (initEntry) {
+      const btn = CarouselController.buttonMap.get(initEntry);
+      ModelLoader.switchModel(btn, initEntry);
+    } else {
+      console.warn('[Init] No models configured for this restaurant.');
+    }
   }
 }
 

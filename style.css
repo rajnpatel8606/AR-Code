@@ -209,6 +209,51 @@ model-viewer {
   border: 1px solid var(--border);
 }
 
+/* ── V2: Category Tabs ────────────────────────────────────────────────────── */
+
+#category-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 18px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+}
+
+#category-tabs::-webkit-scrollbar { display: none; }
+
+#category-tabs:empty { display: none; }
+
+.cat-tab {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.cat-tab.active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+
+.cat-tab:hover:not(.active) {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+/* Hide "Our Dishes" label when category tabs are present */
+.slider.has-tabs::before { display: none; }
+
 /* ── Carousel / Dish Menu ─────────────────────────────────────────────────── */
 
 .slider {
