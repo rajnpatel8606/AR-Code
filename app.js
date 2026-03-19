@@ -50,16 +50,14 @@ const RESTAURANTS = {
     primaryDark:  '#8f3614',   // darker for hover/glow
     bg:           '#faf7f2',   // warm cream page background
     surface:      '#ffffff',   // white card/panel surfaces
-    targetHeight: 0.20,          // 20 cm brand-wide default
     models: [
-      { label: 'Burger',    file: 'assets/food.glb'    , targetHeight: 0.20  }, // 20 cm                           },
-      { label: 'Cold Coffee',  file: 'assets/Cold Cofee.glb',     targetHeight: 0.12  },
-      { label: 'Samosa Plate',  file: 'assets/Samosa Plate LA.glb', targetHeight: 0.12  },
-      { label: 'Orange',  file: 'assets/Orange.glb',       targetHeight: 0.042          }, // 4 cm
-      { label: 'Chicken',     file: 'assets/Chicken.glb',    targetHeight: 0.30  }, // 30 cm
-      { label: 'Cheese Balls', file: 'assets/Cheese Balls 2.glb',  targetHeight: 0.07  }, //  7 cm
-      { label: 'Fruit Salad', file: 'assets/Fruit Salad.glb',  targetHeight: 0.07  }  //  7 cm
-
+      { label: 'Burger',       file: 'assets/food.glb'                  },
+      { label: 'Cold Coffee',  file: 'assets/Cold Cofee.glb'            },
+      { label: 'Samosa Plate', file: 'assets/Samosa Plate LA.glb'       },
+      { label: 'Orange',       file: 'assets/Orange.glb'                },
+      { label: 'Chicken',      file: 'assets/Chicken.glb'               },
+      { label: 'Cheese Balls', file: 'assets/Cheese Balls 2.glb'        },
+      { label: 'Fruit Salad',  file: 'assets/Fruit Salad.glb'           },
     ]
   },
 
@@ -70,10 +68,9 @@ const RESTAURANTS = {
     primaryDark:  '#b8922f',
     bg:           '#0d0d0d',
     surface:      '#1c1a17',
-    targetHeight: 0.20,
     models: [
       // Add models here as GLB files become available
-      // { label: 'Biryani', file: 'biryani.glb', targetHeight: 0.18 }
+      // { label: 'Biryani', file: 'biryani.glb' }
     ]
   },
 
