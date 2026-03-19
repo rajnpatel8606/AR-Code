@@ -83,7 +83,6 @@ const RESTAURANTS = {
         id: 'salads', label: 'Salads',
         models: [
           { label: 'Fruit Salad',  file: 'assets/Fruit Salad.glb',     thumb: 'assets/thumbs/fruit-salad.jpg'  },
-          { label: 'Orange',       file: 'assets/Orange.glb',           thumb: 'assets/thumbs/orange.jpg'       },
         ]
       },
     ]
